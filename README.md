@@ -251,7 +251,7 @@ Imagine a timeout, a state in the future.
 If the current time is zero, the start of the epoch, then the timeout is the
 time from now to when the timeout should be evaluated.
 Thus the timeout is the delta or difference between now and timeout.
-The timeoui can be viewed as a sequence of set bits.
+The timeout can be viewed as a sequence of set bits.
 For example: `0100 1101`.
 
 If we were to wait `0100 0000` units of time then the delta would become
