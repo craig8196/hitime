@@ -1,5 +1,5 @@
 /********************************************************************************
- * Copyright (c) 2019 Craig Jacobson
+ * Copyright (c) 2021 Craig Jacobson
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -40,48 +40,37 @@ typedef struct hitime_node_s
     struct hitime_node_s *prev;
 } hitime_node_t;
 
-typedef struct timeout_s
+typedef struct hitimeout_s
 {
     hitime_node_t node;
     uint32_t index;
     int type;
     uint64_t when;
     void *data;
-} timeout_t;
+} hitimeout_t;
 
-timeout_t *
-timeout_new(void);
 void
-timeout_reset(timeout_t *);
+hitimeout_reset(hitimeout_t *);
 void
-timeout_set(timeout_t *, uint64_t, void *, int);
+hitimeout_set(hitimeout_t *, uint64_t, void *, int);
 uint64_t
-timeout_when(timeout_t *);
+hitimeout_when(hitimeout_t *);
 void *
-timeout_data(timeout_t *);
+hitimeout_data(hitimeout_t *);
 int
-timeout_type(timeout_t *);
-void
-timeout_free(timeout_t **);
+hitimeout_type(hitimeout_t *);
 
+/* sizeof(uint32_t)*8 + 1 for expiry */
 #define HITIME_BINS (33)
 
 typedef struct hitime_s
 {
     /* Internal */
     uint64_t last;
-#if 0
-    uint32_t lapsed;
-#endif
-    uint32_t binset; // which bins have timeouts
-    hitime_node_t bins[HITIME_BINS]; // last bin is expiry
+    uint32_t binset; // which bins have hitimeouts, used for wait
+    hitime_node_t bins[HITIME_BINS];
 } hitime_t;
 
-
-hitime_t *
-hitime_new(void);
-void
-hitime_free(hitime_t * *);
 
 void
 hitime_init(hitime_t *);
@@ -89,9 +78,9 @@ void
 hitime_destroy(hitime_t *);
 
 void
-hitime_start(hitime_t *, timeout_t *);
+hitime_start(hitime_t *, hitimeout_t *);
 void
-hitime_stop(hitime_t *, timeout_t *);
+hitime_stop(hitime_t *, hitimeout_t *);
 
 int
 hitime_get_wait(hitime_t *);
@@ -102,7 +91,7 @@ hitime_timeout(hitime_t *, uint64_t);
 
 void
 hitime_expire_all(hitime_t *);
-timeout_t *
+hitimeout_t *
 hitime_get_next(hitime_t *);
 
 /* Exports for testing. */

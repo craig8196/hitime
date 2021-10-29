@@ -1,4 +1,4 @@
-/*******************************************************************************
+/********************************************************************************
  * Copyright (c) 2021 Craig Jacobson
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -20,64 +20,21 @@
  * SOFTWARE.
  ******************************************************************************/
 /**
- * @file hitime_util.h
+ * @file hitime_all.h
  * @author Craig Jacobson
- * @brief Lower level utilities for simple tasks.
+ * @brief Both hitime.h and hitime_extra.h
  */
-#ifndef HITIME_UTIL_H_
-#define HITIME_UTIL_H_
+#ifndef HITIME_ALL_H_
+#define HITIME_ALL_H_
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-
-#include <string.h>
-
-
-/// @cond DOXYGEN_IGNORE
-
-#define hitime_rawalloc _hitime_rawalloc_impl
-#define hitime_rawrealloc _hitime_rawrealloc_impl
-#define hitime_rawfree _hitime_rawfree_impl
-#define hitime_memzero(p, s) memset((p), 0, (s))
-
-#ifndef LIKELY
-#ifdef __GNUC__
-#define LIKELY(x)   __builtin_expect(!!(x), 1)
-#else
-#define LIKELY(x) (x)
-#endif
-#endif
-
-#ifndef UNLIKELY
-#ifdef __GNUC__
-#define UNLIKELY(x) __builtin_expect(!!(x), 0)
-#else
-#define UNLIKELY(x) (x)
-#endif
-#endif
-
-#ifndef INLINE
-#ifdef __GNUC__
-#define INLINE __attribute__((always_inline)) inline
-#else
-#define INLINE
-#endif
-#endif
-
-#ifndef NOINLINE
-#ifdef __GNUC__
-#define NOINLINE __attribute__((noinline))
-#else
-#define NOINLINE
-#endif
-#endif
-
-/// @endcond
+#include "hitime.h"
+#include "hitime_extra.h"
 
 #ifdef __cplusplus
 }
 #endif
-#endif /* HITIME_UTIL_H_ */
-
+#endif /* HITIME_ALL_H_ */
 

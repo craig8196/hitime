@@ -12,7 +12,7 @@ endif()
 
 add_subdirectory(test)
 
-set(SOURCES src/hitime.c)
+set(SOURCES src/hitime.c src/hitime_extra.c)
 
 add_library(hitime SHARED ${SOURCES})
 set_target_properties(hitime PROPERTIES VERSION ${PROJECT_VERSION})

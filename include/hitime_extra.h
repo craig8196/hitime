@@ -1,4 +1,4 @@
-/*******************************************************************************
+/********************************************************************************
  * Copyright (c) 2021 Craig Jacobson
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -20,64 +20,37 @@
  * SOFTWARE.
  ******************************************************************************/
 /**
- * @file hitime_util.h
+ * @file hitime_extra.h
  * @author Craig Jacobson
- * @brief Lower level utilities for simple tasks.
+ * @brief Extra functions for time and allocation.
  */
-#ifndef HITIME_UTIL_H_
-#define HITIME_UTIL_H_
+#ifndef HITIME_EXTRA_H_
+#define HITIME_EXTRA_H_
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+#include "hitime.h"
 
-#include <string.h>
 
+hitimeout_t *
+hitimeout_new(void);
+void
+hitimeout_free(hitimeout_t **);
 
-/// @cond DOXYGEN_IGNORE
+hitime_t *
+hitime_new(void);
+void
+hitime_free(hitime_t * *);
 
-#define hitime_rawalloc _hitime_rawalloc_impl
-#define hitime_rawrealloc _hitime_rawrealloc_impl
-#define hitime_rawfree _hitime_rawfree_impl
-#define hitime_memzero(p, s) memset((p), 0, (s))
+uint64_t
+hitime_now_ms(void);
 
-#ifndef LIKELY
-#ifdef __GNUC__
-#define LIKELY(x)   __builtin_expect(!!(x), 1)
-#else
-#define LIKELY(x) (x)
-#endif
-#endif
-
-#ifndef UNLIKELY
-#ifdef __GNUC__
-#define UNLIKELY(x) __builtin_expect(!!(x), 0)
-#else
-#define UNLIKELY(x) (x)
-#endif
-#endif
-
-#ifndef INLINE
-#ifdef __GNUC__
-#define INLINE __attribute__((always_inline)) inline
-#else
-#define INLINE
-#endif
-#endif
-
-#ifndef NOINLINE
-#ifdef __GNUC__
-#define NOINLINE __attribute__((noinline))
-#else
-#define NOINLINE
-#endif
-#endif
-
-/// @endcond
+uint64_t
+hitime_now(void);
 
 #ifdef __cplusplus
 }
 #endif
-#endif /* HITIME_UTIL_H_ */
-
+#endif /* HITIME_EXTRA_H_ */
 

@@ -1,6 +1,32 @@
+/*******************************************************************************
+ * Copyright (c) 2021 Craig Jacobson
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ ******************************************************************************/
+/**
+ * @file prove.c
+ * @author Craig Jacobson
+ * @brief Demonstrate correctness of timeout manager.
+ */
 
 #include "bdd.h"
-#include "hitime.h"
+#include "hitime_all.h"
 
 #include <limits.h>
 #include <stdlib.h>
@@ -20,23 +46,23 @@ static hitime_t *ht = &_ht;
 
 spec("hitime library")
 {
-    describe("timeout")
+    describe("hitimeout")
     {
         it("should create, set, reset, and free")
         {
-            timeout_t *t = timeout_new();
-            check(0 == timeout_when(t));
-            check(NULL == timeout_data(t));
-            check(0 == timeout_type(t));
-            timeout_set(t, 1, (void *)1, 1);
-            check(1 == timeout_when(t));
-            check((void *)1 == timeout_data(t));
-            check(1 == timeout_type(t));
-            timeout_reset(t);
-            check(0 == timeout_when(t));
-            check(NULL == timeout_data(t));
-            check(0 == timeout_type(t));
-            timeout_free(&t);
+            hitimeout_t *t = hitimeout_new();
+            check(0 == hitimeout_when(t));
+            check(NULL == hitimeout_data(t));
+            check(0 == hitimeout_type(t));
+            hitimeout_set(t, 1, (void *)1, 1);
+            check(1 == hitimeout_when(t));
+            check((void *)1 == hitimeout_data(t));
+            check(1 == hitimeout_type(t));
+            hitimeout_reset(t);
+            check(0 == hitimeout_when(t));
+            check(NULL == hitimeout_data(t));
+            check(0 == hitimeout_type(t));
+            hitimeout_free(&t);
             check(NULL == t);
         }
     }
@@ -74,7 +100,7 @@ spec("hitime library")
             check((uint64_t)INT_MAX == hitime_max_wait());
         }
 
-        it("should return max wait when no timeouts (white-box)")
+        it("should return max wait when no hitimeouts (white-box)")
         {
             check(hitime_max_wait() == hitime_get_wait(ht));
         }
@@ -85,7 +111,7 @@ spec("hitime library")
             check(NULL == hitime_get_next(ht));
         }
 
-        it("should do nothing on timeout while empty")
+        it("should do nothing on hitimeout while empty")
         {
             hitime_timeout(ht, 1);
             check(NULL == hitime_get_next(ht));
@@ -93,18 +119,18 @@ spec("hitime library")
 
         it("should start and be placed in expiry")
         {
-            timeout_t *t = timeout_new();
+            hitimeout_t *t = hitimeout_new();
             hitime_start(ht, t);
             check(hitime_max_wait() == hitime_get_wait(ht));
             check(t == hitime_get_next(ht));
             check(NULL == hitime_get_next(ht));
-            timeout_free(&t);
+            hitimeout_free(&t);
         }
 
         it("should start and stop")
         {
-            timeout_t *t = timeout_new();
-            timeout_set(t, 1, NULL, 1);
+            hitimeout_t *t = hitimeout_new();
+            hitimeout_set(t, 1, NULL, 1);
 
             hitime_start(ht, t);
 
@@ -112,7 +138,7 @@ spec("hitime library")
             check(1 == hitime_get_wait(ht));
             check(NULL == hitime_get_next(ht));
 
-            /* Check that we have an expired item on timeout. */
+            /* Check that we have an expired item on hitimeout. */
             check(hitime_timeout(ht, 1));
 
             /* Check outgoing. */
@@ -120,13 +146,13 @@ spec("hitime library")
             check(NULL == hitime_get_next(ht));
             check(hitime_max_wait() == hitime_get_wait(ht));
 
-            timeout_free(&t);
+            hitimeout_free(&t);
         }
 
         it("should handle double start with no issue")
         {
-            timeout_t *t = timeout_new();
-            timeout_set(t, 1, NULL, 1);
+            hitimeout_t *t = hitimeout_new();
+            hitimeout_set(t, 1, NULL, 1);
 
             hitime_start(ht, t);
             hitime_start(ht, t);
@@ -136,16 +162,16 @@ spec("hitime library")
             check(t == hitime_get_next(ht));
             check(NULL == hitime_get_next(ht));
             check(hitime_max_wait() == hitime_get_wait(ht));
-            timeout_free(&t);
+            hitimeout_free(&t);
         }
 
         it("should expire all (white-box, order of expiry known)")
         {
-            timeout_t *t1 = timeout_new();
-            timeout_t *t2 = timeout_new();
+            hitimeout_t *t1 = hitimeout_new();
+            hitimeout_t *t2 = hitimeout_new();
 
-            timeout_set(t1, 20, NULL, 0);
-            timeout_set(t2, 20, NULL, 0);
+            hitimeout_set(t1, 20, NULL, 0);
+            hitimeout_set(t2, 20, NULL, 0);
 
             hitime_start(ht, t1);
             hitime_start(ht, t2);
@@ -156,15 +182,15 @@ spec("hitime library")
             check(t2 == hitime_get_next(ht));
             check(NULL == hitime_get_next(ht));
 
-            timeout_free(&t1);
-            timeout_free(&t2);
+            hitimeout_free(&t1);
+            hitimeout_free(&t2);
         }
 
-        it("should remove the timeout from the datastructure")
+        it("should remove the hitimeout from the datastructure")
         {
-            timeout_t *t = timeout_new();
+            hitimeout_t *t = hitimeout_new();
 
-            timeout_set(t, 20, NULL, 0);
+            hitimeout_set(t, 20, NULL, 0);
 
             hitime_start(ht, t);
             hitime_stop(ht, t);
@@ -173,22 +199,22 @@ spec("hitime library")
 
             check(NULL == hitime_get_next(ht));
 
-            timeout_free(&t);
+            hitimeout_free(&t);
         }
 
-        it("should stop an expired timeout")
+        it("should stop an expired hitimeout")
         {
-            timeout_t *t = timeout_new();
+            hitimeout_t *t = hitimeout_new();
 
             check(!hitime_timeout(ht, 30));
             /* Timeout should be immediately expired. */
-            timeout_set(t, 20, NULL, 0);
+            hitimeout_set(t, 20, NULL, 0);
             hitime_start(ht, t);
             hitime_stop(ht, t);
             check(NULL == hitime_get_next(ht));
             check(hitime_max_wait() == hitime_get_wait(ht));
 
-            timeout_free(&t);
+            hitimeout_free(&t);
         }
 
         it("should update the internal time stamp")
@@ -201,9 +227,9 @@ spec("hitime library")
         {
             uint64_t max = hitime_max_wait();
 
-            timeout_t *t = timeout_new();
+            hitimeout_t *t = hitimeout_new();
 
-            timeout_set(t, max + 1, NULL, 0);
+            hitimeout_set(t, max + 1, NULL, 0);
 
             hitime_start(ht, t);
 
@@ -226,14 +252,14 @@ spec("hitime library")
             check(t == hitime_get_next(ht));
             check(NULL == hitime_get_next(ht));
 
-            timeout_free(&t);
+            hitimeout_free(&t);
         }
         
         it("should bulk expire (code-coverage)")
         {
-            timeout_t *t = timeout_new();
+            hitimeout_t *t = hitimeout_new();
 
-            timeout_set(t, 4, NULL, 0);
+            hitimeout_set(t, 4, NULL, 0);
 
             hitime_start(ht, t);
 
@@ -242,14 +268,14 @@ spec("hitime library")
             check(t == hitime_get_next(ht));
             check(NULL == hitime_get_next(ht));
 
-            timeout_free(&t);
+            hitimeout_free(&t);
         }
 
         it("should get proper wait time for wait with (white-box)")
         {
-            timeout_t *t = timeout_new();
+            hitimeout_t *t = hitimeout_new();
 
-            timeout_set(t, 4, NULL, 0);
+            hitimeout_set(t, 4, NULL, 0);
 
             hitime_start(ht, t);
 
@@ -261,7 +287,7 @@ spec("hitime library")
             wait = hitime_get_wait_with(ht, 4);
             check(0 == wait);
 
-            timeout_free(&t);
+            hitimeout_free(&t);
         }
     }
 
@@ -277,10 +303,10 @@ spec("hitime library")
             hitime_destroy(ht);
         }
 
-        it("should bubble up timeout (white-box)")
+        it("should bubble up hitimeout (white-box)")
         {
-            timeout_t *t = timeout_new();
-            timeout_set(t, 0x0F, NULL, 2);
+            hitimeout_t *t = hitimeout_new();
+            hitimeout_set(t, 0x0F, NULL, 2);
 
             hitime_start(ht, t);
 
@@ -314,10 +340,10 @@ spec("hitime library")
             check(NULL == hitime_get_next(ht));
             check(hitime_max_wait() == hitime_get_wait(ht));
 
-            timeout_free(&t);
+            hitimeout_free(&t);
         }
 
-        it("should expire timeouts in order when added in order (white-box)")
+        it("should expire hitimeouts in order when added in order (white-box)")
         {
             int low = 0x001;
             int high = 0x0FF;
@@ -326,8 +352,8 @@ spec("hitime library")
             for (i = 0; i < count; ++i)
             {
                 uint64_t when = low + i;
-                timeout_t *t = timeout_new();
-                timeout_set(t, when, NULL, 0);
+                hitimeout_t *t = hitimeout_new();
+                hitimeout_set(t, when, NULL, 0);
                 hitime_start(ht, t);
             }
 
@@ -336,7 +362,7 @@ spec("hitime library")
             while (hitime_max_wait() != (wait = hitime_get_wait(ht)))
             {
                 now += wait;
-                /* The wait should be 1 because the timeouts are evenly
+                /* The wait should be 1 because the hitimeouts are evenly
                  * spaced.
                  */
                 check(1 == wait);
@@ -346,14 +372,14 @@ spec("hitime library")
             for (i = 0; i < count; ++i)
             {
                 uint64_t when = low + i;
-                timeout_t *t = hitime_get_next(ht);
+                hitimeout_t *t = hitime_get_next(ht);
                 check(t);
-                check(when == timeout_when(t));
-                timeout_free(&t);
+                check(when == hitimeout_when(t));
+                hitimeout_free(&t);
             }
         }
 
-        it("should expire timeouts in order when added in reverse order (white-box)")
+        it("should expire hitimeouts in order when added in reverse order (white-box)")
         {
             int low = 0x001;
             int high = 0x0FF;
@@ -362,8 +388,8 @@ spec("hitime library")
             for (i = count; i > 0; --i)
             {
                 uint64_t when = low + (i - 1);
-                timeout_t *t = timeout_new();
-                timeout_set(t, when, NULL, 0);
+                hitimeout_t *t = hitimeout_new();
+                hitimeout_set(t, when, NULL, 0);
                 hitime_start(ht, t);
             }
 
@@ -372,7 +398,7 @@ spec("hitime library")
             while (hitime_max_wait() != (wait = hitime_get_wait(ht)))
             {
                 now += wait;
-                /* The wait should be 1 because the timeouts are evenly
+                /* The wait should be 1 because the hitimeouts are evenly
                  * spaced.
                  */
                 check(1 == wait);
@@ -382,14 +408,14 @@ spec("hitime library")
             for (i = 0; i < count; ++i)
             {
                 uint64_t when = low + i;
-                timeout_t *t = hitime_get_next(ht);
+                hitimeout_t *t = hitime_get_next(ht);
                 check(t);
-                check(when == timeout_when(t));
-                timeout_free(&t);
+                check(when == hitimeout_when(t));
+                hitimeout_free(&t);
             }
         }
 
-        it("should expire timeouts in order when the start time varies (white-box)")
+        it("should expire hitimeouts in order when the start time varies (white-box)")
         {
             uint64_t startnow = 0x001;
             uint64_t endnow = 0x0FF;
@@ -411,8 +437,8 @@ spec("hitime library")
                 for (i = count; i > 0; --i)
                 {
                     uint64_t when = low + (i - 1) + seednow;
-                    timeout_t *t = timeout_new();
-                    timeout_set(t, when, NULL, 0);
+                    hitimeout_t *t = hitimeout_new();
+                    hitimeout_set(t, when, NULL, 0);
                     hitime_start(ht, t);
                 }
 
@@ -420,7 +446,7 @@ spec("hitime library")
                 while (hitime_max_wait() != (wait = hitime_get_wait(ht)))
                 {
                     now += wait;
-                    /* The wait should be 1 because the timeouts are evenly
+                    /* The wait should be 1 because the hitimeouts are evenly
                      * spaced.
                      */
                     check(1 == wait);
@@ -430,29 +456,29 @@ spec("hitime library")
                 for (i = 0; i < count; ++i)
                 {
                     uint64_t when = low + i + seednow;
-                    timeout_t *t = hitime_get_next(ht);
+                    hitimeout_t *t = hitime_get_next(ht);
                     check(t);
-                    check(when == timeout_when(t));
-                    timeout_free(&t);
+                    check(when == hitimeout_when(t));
+                    hitimeout_free(&t);
                 }
 
                 hitime_destroy(ht);
             }
         }
 
-        it("should expire even largest of timeouts")
+        it("should expire even largest of hitimeouts")
         {
             uint64_t end = (uint64_t)0xFFFFFFFFFFFFFFFFLL;
 
-            timeout_t *t = timeout_new();
-            timeout_set(t, end, NULL, 0);
+            hitimeout_t *t = hitimeout_new();
+            hitimeout_set(t, end, NULL, 0);
 
             hitime_start(ht, t);
             check(hitime_timeout(ht, end));
             check(t == hitime_get_next(ht));
             check(NULL == hitime_get_next(ht));
 
-            timeout_free(&t);
+            hitimeout_free(&t);
         }
     }
 
@@ -461,33 +487,33 @@ spec("hitime library")
         it("should expire properly at or after random timestamp")
         {
             int maxiter = 1000;
-            timeout_t *t = timeout_new();
+            hitimeout_t *t = hitimeout_new();
 
             int i;
             for (i = 0; i < maxiter; ++i)
             {
                 uint64_t start_time = rand64();
-                uint64_t timeout_time = rand64();
-                timeout_time = timeout_time ? timeout_time : 1;
+                uint64_t hitimeout_time = rand64();
+                hitimeout_time = hitimeout_time ? hitimeout_time : 1;
                 uint64_t over_time = rand64() & 0x00FFFFFF;
-                over_time = over_time + timeout_time;
+                over_time = over_time + hitimeout_time;
 
                 hitime_init(ht);
                 hitime_timeout(ht, start_time);
 
-                timeout_set(t, timeout_time, NULL, 0);
+                hitimeout_set(t, hitimeout_time, NULL, 0);
 
                 hitime_start(ht, t);
 
-                if (timeout_time <= start_time)
+                if (hitimeout_time <= start_time)
                 {
                     check(t == hitime_get_next(ht));
                     check(NULL == hitime_get_next(ht));
                 }
                 else
                 {
-                    check(!hitime_timeout(ht, timeout_time - 1));
-                    check(hitime_timeout(ht, timeout_time));
+                    check(!hitime_timeout(ht, hitimeout_time - 1));
+                    check(hitime_timeout(ht, hitimeout_time));
                     check(t == hitime_get_next(ht));
                     check(NULL == hitime_get_next(ht));
                 }
@@ -495,11 +521,11 @@ spec("hitime library")
                 hitime_destroy(ht);
                 hitime_init(ht);
 
-                timeout_set(t, timeout_time, NULL, 0);
+                hitimeout_set(t, hitimeout_time, NULL, 0);
 
                 hitime_start(ht, t);
 
-                if (over_time >= timeout_time)
+                if (over_time >= hitimeout_time)
                 {
                     check(hitime_timeout(ht, over_time));
                     check(t == hitime_get_next(ht));
@@ -509,7 +535,20 @@ spec("hitime library")
                 hitime_destroy(ht);
             }
 
-            timeout_free(&t);
+            hitimeout_free(&t);
+        }
+    }
+
+    describe("getting time")
+    {
+        it("should get the current time in seconds")
+        {
+            check(hitime_now());
+        }
+
+        it("should get the current time in milliseconds seconds")
+        {
+            check(hitime_now_ms());
         }
     }
 }

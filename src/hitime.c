@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2019 Craig Jacobson
+ * Copyright (c) 2021 Craig Jacobson
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -22,7 +22,7 @@
 /**
  * @file hitime.c
  * @author Craig Jacobson
- * @brief Hierarchical timeout manager implementation.
+ * @brief Hierarchical hitimeout manager implementation.
  */
 
 #include "hitime_util.h"
@@ -34,114 +34,18 @@
 #include <stdlib.h>
 
 
-#ifndef LIKELY
-#ifdef __GNUC__
-#define LIKELY(x)   __builtin_expect(!!(x), 1)
-#else
-#define LIKELY(x) (x)
-#endif
-#endif
-
-#ifndef UNLIKELY
-#ifdef __GNUC__
-#define UNLIKELY(x) __builtin_expect(!!(x), 0)
-#else
-#define UNLIKELY(x) (x)
-#endif
-#endif
-
-#ifndef INLINE
-#ifdef __GNUC__
-#define INLINE __attribute__((always_inline)) inline
-#else
-#define INLINE
-#endif
-#endif
-
-#ifndef NOINLINE
-#ifdef __GNUC__
-#define NOINLINE __attribute__((noinline))
-#else
-#define NOINLINE
-#endif
-#endif
-
-
-/*******************************************************************************
- * ALLOC FUNCTIONS
-*******************************************************************************/
-
-static void
-_hitime_abort(bool is_malloc, size_t size)
-{
-    const char msg[] = "hitime %salloc(%zu) failure";
-
-    /* The 2 is for the prefix "re".
-     * Note that 2**64 is actually 20 max chars, good to have space.
-     */
-    char buf[sizeof(msg) + 2 + 32];
-
-    snprintf(buf, sizeof(buf), msg, is_malloc ? "m" : "re", size);
-    perror(buf);
-    abort();
-}
-
-INLINE static void *
-_hitime_rawalloc_impl(size_t size)
-{
-    void *mem = malloc(size);
-    if (UNLIKELY(!mem))
-    {
-        _hitime_abort(true, size);
-    }
-    return mem;
-}
-
-#if 0
-INLINE static void *
-_hitime_rawrealloc_impl(void *oldmem, size_t size)
-{
-    void *mem = realloc(oldmem, size);
-    if (UNLIKELY(!mem))
-    {
-        _hitime_abort(false, size);
-    }
-    return mem;
-}
-#endif
-
-/*
- * Don't check for NULL since hitime_free does operations
- * that would cause segfault anyways.
- */
-INLINE static void
-_hitime_rawfree_impl(void *mem)
-{
-    free(mem);
-}
-
 /*******************************************************************************
  * TIMEOUT FUNCTIONS
 *******************************************************************************/
 
-timeout_t *
-timeout_new(void)
-{
-    timeout_t *t = hitime_rawalloc(sizeof(timeout_t));
-
-    hitime_memzero(t, sizeof(timeout_t));
-
-    return t;
-}
-
 void
-timeout_reset(timeout_t *t)
+hitimeout_reset(hitimeout_t *t)
 {
     hitime_memzero(t, sizeof(*t));
 }
 
 void
-timeout_set(timeout_t *t, uint64_t when, void *data, int type)
+hitimeout_set(hitimeout_t *t, uint64_t when, void *data, int type)
 {
     t->when = when;
     t->data = data;
@@ -149,28 +53,21 @@ timeout_set(timeout_t *t, uint64_t when, void *data, int type)
 }
 
 uint64_t
-timeout_when(timeout_t *t)
+hitimeout_when(hitimeout_t *t)
 {
     return t->when;
 }
 
 void *
-timeout_data(timeout_t *t)
+hitimeout_data(hitimeout_t *t)
 {
     return t->data;
 }
 
 int
-timeout_type(timeout_t *t)
+hitimeout_type(hitimeout_t *t)
 {
     return t->type;
-}
-
-void
-timeout_free(timeout_t **t)
-{
-    hitime_rawfree(*t);
-    *t = NULL;
 }
 
 
@@ -184,14 +81,6 @@ static uint32_t UPPERBIT = 0x80000000;
 static int EXPIRYINDEX = 32;
 static int MAXINDEX = 31;
 
-#if 0
-INLINE static uint64_t
-get_delta(hitime_t *h, timeout_t *t)
-{
-    return (t->when - h->last);
-}
-#endif
-
 INLINE static int
 _pop32(uint32_t n)
 {
@@ -201,18 +90,10 @@ _pop32(uint32_t n)
 }
 
 INLINE static int
-is_expired(hitime_t *h, timeout_t *t)
+is_expired(hitime_t *h, hitimeout_t *t)
 {
     return (t->when <= h->last);
 }
-
-#if 0
-INLINE static bool
-is_invalid_delta(uint64_t d)
-{
-    return (d > DELTMAX);
-}
-#endif
 
 /**
  * @warn Do NOT call with zero.
@@ -282,25 +163,25 @@ binset_clear_all(hitime_t *h)
 #endif
 
 INLINE static hitime_node_t *
-to_node(timeout_t *t)
+to_node(hitimeout_t *t)
 {
     return &t->node;
 }
 
-INLINE static timeout_t *
+INLINE static hitimeout_t *
 to_timeout(hitime_node_t *n)
 {
-    return n ? recover_ptr(n, timeout_t, node): NULL;
+    return n ? recover_ptr(n, hitimeout_t, node): NULL;
 }
 
 INLINE static int
-timeout_index(timeout_t *t)
+hitimeout_index(hitimeout_t *t)
 {
     return t->index;
 }
 
 INLINE static void
-timeout_set_index(timeout_t *t, int index)
+hitimeout_set_index(hitimeout_t *t, int index)
 {
     t->index = index;
 }
@@ -411,11 +292,11 @@ list_append(hitime_node_t *l1, hitime_node_t *l2)
 *******************************************************************************/
 
 INLINE static int
-ht_nq(hitime_t *h, timeout_t *t)
+ht_nq(hitime_t *h, hitimeout_t *t)
 {
     int index;
 
-    /* Find which list to add the timeout to. */
+    /* Find which list to add the hitimeout to. */
     uint64_t bits = t->when ^ h->last;
     if (UNLIKELY(bits > WAITMAX))
     {
@@ -425,46 +306,10 @@ ht_nq(hitime_t *h, timeout_t *t)
     {
         index = get_high_index((uint32_t)bits);
     }
-#if 0
-    uint64_t delta = get_delta(h, t);
-    if (UNLIKELY(is_invalid_delta(delta)))
-    {
-        index = MAXINDEX;
-    }
-    else
-    {
-        // TODO this differs from the algorithm, which is correct?
-        uint32_t norm = (uint32_t)((delta + h->lapsed) ^ h->lapsed);
-        index = get_high_index(norm);
-    }
-#endif
 
     binset_set(h, index);
-    timeout_set_index(t, index);
+    hitimeout_set_index(t, index);
     list_nq(&h->bins[index], to_node(t));
-}
-
-/**
- * @return Heap allocated hitime_t struct pointer.
- */
-hitime_t *
-hitime_new(void)
-{
-    hitime_t *h = hitime_rawalloc(sizeof(hitime_t));
-    hitime_init(h);
-    return h;
-}
-
-/**
- * @brief Free allocated hitime_t struct pointer.
- * @param h
- */
-void
-hitime_free(hitime_t **h)
-{
-    hitime_destroy(*h);
-    hitime_rawfree(*h);
-    *h = NULL;
 }
 
 /**
@@ -479,9 +324,9 @@ hitime_init(hitime_t *h)
 
 /**
  * @brief Cleanup embedded struct that was previously initialized.
- * @warn You must cleanup all timeouts before calling this;
- *       recommended to first handle expired timeouts,
- *       second call hitime_expire_all and handle remaining expired timeouts.
+ * @warn You must cleanup all hitimeouts before calling this;
+ *       recommended to first handle expired hitimeouts,
+ *       second call hitime_expire_all and handle remaining expired hitimeouts.
  */
 void
 hitime_destroy(hitime_t *h)
@@ -490,16 +335,16 @@ hitime_destroy(hitime_t *h)
 }
 
 /**
- * @brief Add the timeout to the manager.
+ * @brief Add the hitimeout to the manager.
  * @param h
- * @param t - The timeout to add.
+ * @param t - The hitimeout to add.
  *
- * If the timeout appears to be a part of a list already, do nothing.
- * If the timeout has already expired then added to expired list.
- * Otherwise, the timeout to the internal data structure for future processing.
+ * If the hitimeout appears to be a part of a list already, do nothing.
+ * If the hitimeout has already expired then added to expired list.
+ * Otherwise, the hitimeout to the internal data structure for future processing.
  */
 void
-hitime_start(hitime_t * h, timeout_t *t)
+hitime_start(hitime_t * h, hitimeout_t *t)
 {
     /* Timeouts should not be in a list already. */
     if (UNLIKELY(node_in_list(to_node(t))))
@@ -512,7 +357,7 @@ hitime_start(hitime_t * h, timeout_t *t)
      */
     if (UNLIKELY(is_expired(h, t)))
     {
-        timeout_set_index(t, EXPIRYINDEX);
+        hitimeout_set_index(t, EXPIRYINDEX);
         list_nq(expiry(h), to_node(t));
     }
     else
@@ -525,15 +370,15 @@ hitime_start(hitime_t * h, timeout_t *t)
 
 /**
  * @param h
- * @param t - The timeout to stop.
+ * @param t - The hitimeout to stop.
  * @brief Stop the timer by removing it from the datastructure.
  */
 void
-hitime_stop(hitime_t *h, timeout_t *t)
+hitime_stop(hitime_t *h, hitimeout_t *t)
 {
     if (node_in_list(to_node(t)))
     {
-        int index = timeout_index(t);
+        int index = hitimeout_index(t);
         
         /* Unlink must happen or list is never empty. */
         node_unlink(to_node(t));
@@ -569,7 +414,7 @@ ht_get_wait(hitime_t *h)
     }
     else
     {
-        /* There are no timeouts. Set to maximum. */
+        /* There are no hitimeouts. Set to maximum. */
         return (int)WAITMAX;
     }
 }
@@ -606,7 +451,7 @@ ht_process(hitime_t *h, hitime_node_t *l)
     {
         hitime_node_t *next = curr->next;
 
-        timeout_t *t = to_timeout(curr);
+        hitimeout_t *t = to_timeout(curr);
         node_unlink(curr);
         if (UNLIKELY(is_expired(h, t)))
         {
@@ -622,7 +467,7 @@ ht_process(hitime_t *h, hitime_node_t *l)
 }
 
 /**
- * @brief Move any expired timeouts to expired list.
+ * @brief Move any expired hitimeouts to expired list.
  * @param h
  * @param now - The current time.
  * @return True if there are expired timers.
@@ -644,7 +489,7 @@ hitime_timeout(hitime_t *h, uint64_t now)
         /* Update concept of now. */
         h->last = now;
 
-        /* First bin always expires since there is a guaranteed timeout
+        /* First bin always expires since there is a guaranteed hitimeout
          * of granularity 1.
          */
         if(list_has(h->bins))
@@ -759,9 +604,9 @@ hitime_expire_all(hitime_t * h)
 
 /**
  * @param h
- * @return The next expired timeout; NULL if none.
+ * @return The next expired hitimeout; NULL if none.
  */
-timeout_t *
+hitimeout_t *
 hitime_get_next(hitime_t *h)
 {
     return to_timeout(list_dq(expiry(h)));
