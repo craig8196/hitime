@@ -8,6 +8,7 @@ Note that this library was renamed hitime, from hightime.
 - [Disclaimer](#disclaimer)
 - [Features](#features)
 - [Design](#design)
+- [Coding Standards](#coding-standards)
 - [Time Complexity](#time-complexity)
 - [Space Complexity](#space-complexity)
 - [Code Examples](#code-examples)
@@ -52,6 +53,7 @@ The following are reasons you might want to use this timeout manager:
    any other granularity.
    Be warned that below milliseconds is not recommended;
    the code can be retooled to better support sub-milliseconds.
+1. 100% core code coverage (`hitime.c`).
 
 
 ## Design
@@ -65,14 +67,20 @@ This framework does require the following assumptions:
 1. Time is monotonically increasing.
 1. Timeouts are not greater than (2^(bits-1)) - 1 from the current time.
    Note that I will probably be using 32 bits.
-   Note that both the elapsed time timeout and the delta timeout cannot
-   exceed the limitation.
+   Note that this can be violated, but at a potential performance cost.
 1. All time is of the same granularity (you must make any conversions).
 
 The peculiar design of this tool is so it could be tested quickly and reliably.
 This is why the user must pass in the current time.
 The user may call `hitime_timeout` at any time to force an update;
 although, this function may take some time to execute.
+
+
+## Coding Standards
+<a name="coding-standards" />
+
+I loosely follow the Barr Group coding standards.
+I find their standards a good basis for C programming.
 
 
 ## Time Complexity
@@ -97,7 +105,7 @@ The following will need to be vetted, but...
 
 Each struct is fixed and space complexity only grows linearly with the 
 number of timeouts.
-Each `timeout_t` is roughly 40 octets on a 64-bit system.
+Each `hitimeout_t` is roughly 40 octets on a 64-bit system.
 The `hitime_t` struct is about 544 octets (33*2*8 + 8 + 2*4) on a 64-bit system.
 Needless to say this does not nicely fit on a 64 octet cache line.
 
@@ -120,7 +128,7 @@ It is recommended to wrap the functions so you don't make a mistake.
 
 1. Start:
 
-        timeout_t *t = timeout_new();
+        hitimeout_t *t = hitimeout_new();
         hitime_start(&ht, t);
 
 1. Stop:
@@ -131,9 +139,9 @@ It is recommended to wrap the functions so you don't make a mistake.
 
         int wait = hitime_get_wait(&ht);
         sleep_ms(wait);
-        if (hitime_timeout(&ht, timeout_now_ms()))
+        if (hitime_timeout(&ht, hitimeout_now_ms()))
         {
-            timeout_t t;
+            hitimeout_t t;
             while ((t = hitime_get_next(&ht)))
             {
                 // process t
@@ -142,7 +150,7 @@ It is recommended to wrap the functions so you don't make a mistake.
 
 1. Destroy:
 
-        timeout_t t;
+        hitimeout_t t;
         hitime_expire_all(&ht);
         while ((t = hitime_get_next(&ht)))
         {

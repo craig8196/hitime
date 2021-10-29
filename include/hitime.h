@@ -36,17 +36,17 @@ extern "C" {
 
 typedef struct hitime_node_s
 {
-    struct hitime_node_s *next;
-    struct hitime_node_s *prev;
+    struct hitime_node_s * next;
+    struct hitime_node_s * prev;
 } hitime_node_t;
 
 typedef struct hitimeout_s
 {
     hitime_node_t node;
-    uint32_t index;
-    int type;
-    uint64_t when;
-    void *data;
+    uint32_t      index;
+    int           type;
+    uint64_t      when;
+    void *        data;
 } hitimeout_t;
 
 void
@@ -66,8 +66,8 @@ hitimeout_type(hitimeout_t *);
 typedef struct hitime_s
 {
     /* Internal */
-    uint64_t last;
-    uint32_t binset; // which bins have hitimeouts, used for wait
+    uint64_t      last;
+    uint32_t      binset; // which bins have hitimeouts, used for wait
     hitime_node_t bins[HITIME_BINS];
 } hitime_t;
 

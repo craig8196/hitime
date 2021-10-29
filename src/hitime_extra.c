@@ -138,7 +138,7 @@ hitime_now_ms(void)
         return 0;
     }
 
-    return (((uint64_t)ts.tv_sec) * 1000) + (uint64_t)ts.tv_nsec/1000000;
+    return (((uint64_t)ts.tv_sec) * 1000) + ((uint64_t)ts.tv_nsec/1000000);
 }
 
 /**
