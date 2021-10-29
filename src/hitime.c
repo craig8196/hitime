@@ -39,9 +39,20 @@
 *******************************************************************************/
 
 void
-hitimeout_reset(hitimeout_t *t)
+hitimeout_init(hitimeout_t *t)
 {
     hitime_memzero(t, sizeof(*t));
+}
+
+void
+hitimeout_reset(hitimeout_t *t)
+{
+    hitimeout_init(t);
+}
+
+void
+hitimeout_destroy(hitimeout_t * UNUSED(t))
+{
 }
 
 void

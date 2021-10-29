@@ -50,7 +50,11 @@ typedef struct hitimeout_s
 } hitimeout_t;
 
 void
+hitimeout_init(hitimeout_t *);
+void
 hitimeout_reset(hitimeout_t *);
+void
+hitimeout_destroy(hitimeout_t *);
 void
 hitimeout_set(hitimeout_t *, uint64_t, void *, int);
 uint64_t

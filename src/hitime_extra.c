@@ -85,9 +85,7 @@ hitimeout_t *
 hitimeout_new(void)
 {
     hitimeout_t *t = hitime_rawalloc(sizeof(hitimeout_t));
-
-    hitime_memzero(t, sizeof(hitimeout_t));
-
+    hitimeout_init(t);
     return t;
 }
 

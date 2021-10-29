@@ -42,35 +42,39 @@ extern "C" {
 #define hitime_memzero(p, s) memset((p), 0, (s))
 
 #ifndef LIKELY
-#ifdef __GNUC__
-#define LIKELY(x)   __builtin_expect(!!(x), 1)
-#else
-#define LIKELY(x) (x)
-#endif
+#   ifdef __GNUC__
+#       define LIKELY(x)   __builtin_expect(!!(x), 1)
+#   else
+#       define LIKELY(x) (x)
+#   endif
 #endif
 
 #ifndef UNLIKELY
-#ifdef __GNUC__
-#define UNLIKELY(x) __builtin_expect(!!(x), 0)
-#else
-#define UNLIKELY(x) (x)
-#endif
+#   ifdef __GNUC__
+#       define UNLIKELY(x) __builtin_expect(!!(x), 0)
+#   else
+#       define UNLIKELY(x) (x)
+#   endif
 #endif
 
 #ifndef INLINE
-#ifdef __GNUC__
-#define INLINE __attribute__((always_inline)) inline
-#else
-#define INLINE
-#endif
+#   ifdef __GNUC__
+#       define INLINE __attribute__((always_inline)) inline
+#   else
+#       define INLINE
+#   endif
 #endif
 
 #ifndef NOINLINE
-#ifdef __GNUC__
-#define NOINLINE __attribute__((noinline))
-#else
-#define NOINLINE
+#   ifdef __GNUC__
+#       define NOINLINE __attribute__((noinline))
+#   else
+#       define NOINLINE
+#   endif
 #endif
+
+#ifndef UNUSED
+#   define UNUSED
 #endif
 
 /// @endcond
