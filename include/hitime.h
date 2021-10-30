@@ -40,7 +40,7 @@ typedef struct hitime_node_s
     struct hitime_node_s * prev;
 } hitime_node_t;
 
-typedef struct hitimeout_s
+typedef struct
 {
     hitime_node_t node;
     uint32_t      index;
@@ -64,10 +64,10 @@ hitimeout_data(hitimeout_t *);
 int
 hitimeout_type(hitimeout_t *);
 
-/* sizeof(uint32_t)*8 + 1 for expiry */
-#define HITIME_BINS (33)
+/* sizeof(uint32_t)*8 + 1 for expiry + 1 for processing */
+#define HITIME_BINS (34)
 
-typedef struct hitime_s
+typedef struct
 {
     /* Internal */
     uint64_t      last;
@@ -103,6 +103,18 @@ uint64_t
 hitime_max_wait(void);
 uint64_t
 hitime_get_last(hitime_t *);
+
+/* State management for partial timeout calls. */
+typedef struct
+{
+    int      state;
+    uint64_t now;
+} hitimestate_t;
+
+void
+hitimestate_init(hitimestate_t *, uint64_t);
+bool
+hitime_timeout_r(hitime_t *, hitimestate_t *, int);
 
 
 #ifdef __cplusplus

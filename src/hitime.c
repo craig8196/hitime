@@ -90,6 +90,7 @@ static uint64_t WAITMAX = INT_MAX;
 static uint64_t DELTMAX = INT_MAX;
 static uint32_t UPPERBIT = 0x80000000;
 static int EXPIRYINDEX = 32;
+static int PROCESSINDEX = 33;
 static int MAXINDEX = 31;
 
 INLINE static int
@@ -138,9 +139,15 @@ get_elpased(uint64_t now, uint64_t last)
 }
 
 INLINE static hitime_node_t *
-expiry(hitime_t *h)
+ht_expiry(hitime_t *h)
 {
     return &h->bins[EXPIRYINDEX];
+}
+
+INLINE static hitime_node_t *
+ht_process(hitime_t *h)
+{
+    return &h->bins[PROCESSINDEX];
 }
 
 INLINE static void
@@ -289,6 +296,11 @@ list_clear_all(hitime_node_t *l, size_t num)
 }
 
 
+/**
+ * @brief Append items from l2 to l1.
+ * @warn l2 cannot be empty.
+ * @warn l2 is left in invalid state.
+ */
 INLINE static void
 list_append(hitime_node_t *l1, hitime_node_t *l2)
 {
@@ -330,7 +342,7 @@ void
 hitime_init(hitime_t *h)
 {
     hitime_memzero(h, sizeof(*h));
-    list_clear_all(h->bins, 33);
+    list_clear_all(h->bins, HITIME_BINS);
 }
 
 /**
@@ -369,7 +381,7 @@ hitime_start(hitime_t * h, hitimeout_t *t)
     if (UNLIKELY(is_expired(h, t)))
     {
         hitimeout_set_index(t, EXPIRYINDEX);
-        list_nq(expiry(h), to_node(t));
+        list_nq(ht_expiry(h), to_node(t));
     }
     else
     {
@@ -454,27 +466,123 @@ hitime_get_wait_with(hitime_t *h, uint64_t now)
     return diff < w ? (int)(w - diff) : 0;
 }
 
+/**
+ * @brief First bin always expires since there is a guaranteed hitimeout
+ *        of granularity 1.
+ */
 INLINE static void
-ht_process(hitime_t *h, hitime_node_t *l)
+ht_expire_first(hitime_t *h)
 {
-    hitime_node_t *curr = l->next;
-    while (curr != l)
+    if(list_has(h->bins))
     {
-        hitime_node_t *next = curr->next;
-
-        hitimeout_t *t = to_timeout(curr);
-        node_unlink(curr);
-        if (UNLIKELY(is_expired(h, t)))
-        {
-            list_nq(expiry(h), curr);
-        }
-        else
-        {
-            ht_nq(h, t);
-        }
-
-        curr = next;
+        list_append(ht_expiry(h), h->bins);
+        list_clear(h->bins);
+        binset_clear(h, 0);
     }
+}
+
+/**
+ * @brief Expire bins in bulk below a certain threshold.
+ * @return Index of final bin processed.
+ */
+INLINE static int
+ht_expire_bulk(hitime_t *h, uint64_t now)
+{
+    int index = 1;
+    uint32_t elapsed = get_elpased(now, h->last);
+
+    /* NOTE:
+     * If the elapsed time is less than the needed (wait time)
+     * then we check bins needlessly.
+     * However, storing the wait time and checking it will likely consume as much
+     * time so we don't perform that optimization.
+     * Also, juggling one more item of state doesn't seem worthwhile.
+     */
+
+    /* Get index of guaranteed expires. */
+    int index_max = get_high_index(elapsed);
+    for (; index < index_max; ++index)
+    {
+        hitime_node_t *l = h->bins + index;
+        if (list_has(l))
+        {
+            list_append(ht_expiry(h), l);
+            list_clear(l);
+            binset_clear(h, index);
+        }
+    }
+
+    return index;
+}
+
+/**
+ * @return The max index of bins to review.
+ */
+INLINE static void
+ht_expire_individually_setup(hitime_t *h, int index, uint64_t now)
+{
+    uint64_t bits = now ^ h->last;
+    int max_index;
+    if (UNLIKELY(bits > WAITMAX))
+    {
+        max_index = MAXINDEX;
+    }
+    else
+    {
+        max_index = get_high_index((uint32_t)bits);
+    }
+
+    for (; index <= max_index; ++index)
+    {
+        hitime_node_t *l = h->bins + index;
+        if (list_has(l))
+        {
+            list_append(ht_process(h), l);
+            list_clear(l);
+            binset_clear(h, index);
+        }
+    }
+}
+
+/**
+ * @brief Check timeouts one-by-one and reassign to bins.
+ */
+INLINE static int
+ht_expire_individually(hitime_t *h, int maxops)
+{
+    int ops = 0;
+
+    hitime_node_t *l = ht_process(h);
+    if (list_has(l) && ops < maxops)
+    {
+        hitime_node_t *curr = l->next;
+        while (curr != l && ops < maxops)
+        {
+            hitime_node_t *next = curr->next;
+
+            hitimeout_t *t = to_timeout(curr);
+            node_unlink(curr);
+            if (UNLIKELY(is_expired(h, t)))
+            {
+                list_nq(ht_expiry(h), curr);
+            }
+            else
+            {
+                ht_nq(h, t);
+            }
+
+            ++ops;
+            curr = next;
+        }
+    }
+
+    return ops;
+}
+
+INLINE static void
+ht_update_last(hitime_t *h, uint64_t now)
+{
+    h->last = now;
 }
 
 /**
@@ -486,105 +594,23 @@ ht_process(hitime_t *h, hitime_node_t *l)
 bool
 hitime_timeout(hitime_t *h, uint64_t now)
 {
-    /* Make sure we're advancing time-wise. */
+#if 0
+    // Make sure we're advancing time-wise.
     if (now > h->last)
     {
-        uint32_t elapsed = get_elpased(now, h->last);
-        /* If the elapsed time is less than the needed then we check bins
-         * needlessly.
-         */
-        // TODO check that elapsed >= wait
-
-        /* Save last. */
-        uint64_t last = h->last;
-        /* Update concept of now. */
-        h->last = now;
-
-        /* First bin always expires since there is a guaranteed hitimeout
-         * of granularity 1.
-         */
-        if(list_has(h->bins))
-        {
-            list_append(expiry(h), h->bins);
-            list_clear(h->bins);
-            binset_clear(h, 0);
-        }
-
-        int index0 = 1;
-
-        /* Get index of guaranteed expires. */
-        int index1 = get_high_index(elapsed);
-        for (; index0 < index1; ++index0)
-        {
-            hitime_node_t *l = h->bins + index0;
-            if (list_has(l))
-            {
-                list_append(expiry(h), l);
-                list_clear(l);
-                binset_clear(h, index0);
-            }
-        }
-
-        uint64_t bits = now ^ last;
-        int index2;
-        if (UNLIKELY(bits > WAITMAX))
-        {
-            index2 = MAXINDEX;
-        }
-        else
-        {
-            index2 = get_high_index((uint32_t)bits);
-        }
-#if 0
-        uint32_t newlapsed = h->lapsed + lapsed;
-        int index2 = get_high_index(newlapsed ^ h->lapsed);
-        h->lapsed = newlapsed;
+        ht_expire_first(h);
+        int index = ht_expire_bulk(h, now);
+        ht_expire_individually_setup(h, index, now);
+        ht_update_last(h, now);
+        while (ht_expire_individually(h, INT_MAX));
+    }
 #endif
 
-        bool overflow = false;
-        if (MAXINDEX == index2)
-        {
-            --index2;
-            overflow = true;
-        }
-        
-        // TODO we may be able to short-circuit the checks...
-        //      this is because everything between the triggered bin and the
-        //      lapsed time bins aren't necessarily triggered, but they
-        //      do need to be checked
-        //      We could check the index against the binset.
-        /* Get index of expires to re-check. */
-        for (; index0 <= index2; ++index0)
-        {
-            hitime_node_t *l = h->bins + index0;
-            ht_process(h, l);
-            if (list_empty(l))
-            {
-                binset_clear(h, index0);
-            }
-        }
+    hitimestate_t state;
+    hitimestate_init(&state, now);
+    while (!hitime_timeout_r(h, &state, INT_MAX));
 
-        if (UNLIKELY(overflow && list_has(h->bins + MAXINDEX)))
-        {
-            /* Process the final bin.
-             * All nodes must be processed.
-             * Some nodes may be placed back into the same bin.
-             * The list must be moved so we can reinsert without issue.
-             */
-            hitime_node_t list;
-            hitime_node_t *l = &list;
-            list_move(l, h->bins + MAXINDEX);
-            list_clear(h->bins + MAXINDEX);
-            ht_process(h, l);
-
-            if (list_empty(h->bins + MAXINDEX))
-            {
-                binset_clear(h, MAXINDEX);
-            }
-        }
-    }
-
-    return !list_empty(expiry(h));
+    return !list_empty(ht_expiry(h));
 }
 
 /**
@@ -604,12 +630,20 @@ hitime_expire_all(hitime_t * h)
             hitime_node_t *l = ls + i;
             if (list_has(l))
             {
-                list_append(expiry(h), l);
+                list_append(ht_expiry(h), l);
             }
         }
 
-        binset_clear_all(h);
+        // Clear all lists.
         list_clear_all(ls, 32);
+        binset_clear_all(h);
+    }
+
+    // Move everything from the process list to expiry.
+    if (list_has(ht_process(h)))
+    {
+        list_append(ht_expiry(h), ht_process(h));
+        list_clear(ht_process(h));
     }
 }
 
@@ -620,7 +654,7 @@ hitime_expire_all(hitime_t * h)
 hitimeout_t *
 hitime_get_next(hitime_t *h)
 {
-    return to_timeout(list_dq(expiry(h)));
+    return to_timeout(list_dq(ht_expiry(h)));
 }
 
 uint64_t
@@ -633,5 +667,71 @@ uint64_t
 hitime_get_last(hitime_t *h)
 {
     return h->last;
+}
+
+enum hitimestate
+{
+    HITIMESTATE_START = 0,
+    HITIMESTATE_EXPIRE,
+    HITIMESTATE_DONE,
+};
+
+void
+hitimestate_init(hitimestate_t *hts, uint64_t now)
+{
+    hts->state = HITIMESTATE_START;
+    hts->now = now;
+}
+
+/**
+ * @brief Process up to maxops of data.
+ * @warn If the overflow bin is being processed it cannot be interrupted.
+ */
+bool
+hitime_timeout_r(hitime_t *h, hitimestate_t *hts, int maxops)
+{
+    int ops = 0;
+
+    do
+    {
+        switch (hts->state)
+        {
+            case HITIMESTATE_START:
+                if (hts->now > h->last)
+                {
+
+                    ht_expire_first(h);
+                    ++ops;
+                    int index = ht_expire_bulk(h, hts->now);
+                    ++ops;
+                    ht_expire_individually_setup(h, index, hts->now);
+                    ++ops;
+                    hts->state = HITIMESTATE_EXPIRE;
+                }
+                else
+                {
+                    hts->state = HITIMESTATE_DONE;
+                }
+                ht_update_last(h, hts->now);
+            break;
+
+            case HITIMESTATE_EXPIRE:
+            {
+                int ops_done = ht_expire_individually(h, maxops - ops);
+                ops += ops_done;
+                if (!ops_done && ops < maxops)
+                {
+                    hts->state = HITIMESTATE_DONE;
+                }
+            }
+            break;
+
+            default:
+                hts->state = HITIMESTATE_DONE;
+            break;
+        }
+    } while (ops < maxops && !(hts->state == HITIMESTATE_DONE));
+
+    return (hts->state == HITIMESTATE_DONE);
 }
 

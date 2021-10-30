@@ -315,25 +315,29 @@ spec("hitime library")
             int wait;
 
             wait = hitime_get_wait(ht);
-            check(0x08 == wait, "wait was %d", wait);
+            int expected = 0x08;
+            check(expected == wait, "wait was %d, expected %d", wait, expected);
             now += wait;
             check(!hitime_timeout(ht, now));
             check(NULL == hitime_get_next(ht));
 
             wait = hitime_get_wait(ht);
-            check(0x04 == wait, "wait was %d", wait);
+            expected = 0x04;
+            check(expected == wait, "wait was %d, expected %d", wait, expected);
             now += wait;
             check(!hitime_timeout(ht, now));
             check(NULL == hitime_get_next(ht));
 
             wait = hitime_get_wait(ht);
-            check(0x02 == wait, "wait was %d", wait);
+            expected = 0x02;
+            check(expected == wait, "wait was %d, expected %d", wait, expected);
             now += wait;
             check(!hitime_timeout(ht, now));
             check(NULL == hitime_get_next(ht));
 
             wait = hitime_get_wait(ht);
-            check(0x01 == wait, "wait was %d", wait);
+            expected = 0x01;
+            check(expected == wait, "wait was %d, expected %d", wait, expected);
             now += wait;
             check(hitime_timeout(ht, now));
             check(t == hitime_get_next(ht));
@@ -549,6 +553,60 @@ spec("hitime library")
         it("should get the current time in milliseconds seconds")
         {
             check(hitime_now_ms());
+        }
+    }
+
+    describe("re-entrant timeout with state")
+    {
+        before_each()
+        {
+            hitime_init(ht);
+        }
+
+        after_each()
+        {
+            hitime_destroy(ht);
+        }
+
+        it("should switch to done with invalid state value (code-coverage)")
+        {
+            hitimestate_t state;
+            state.state = 20;
+
+            check(hitime_timeout_r(ht, &state, 0));
+        }
+
+        it("should switch to done with invalid time sequence (code-coverage)")
+        {
+            uint64_t now = 2;
+
+            hitime_timeout(ht, now);
+
+            now = 1;
+
+            hitimestate_t state;
+            hitimestate_init(&state, now);
+            check(hitime_timeout_r(ht, &state, 0));
+        }
+
+        it("should move unfinished timeout update items to expiry")
+        {
+            hitime_timeout(ht, 1);
+
+            hitimeout_t *t = hitimeout_new();
+            hitimeout_set(t, 2, NULL, 0);
+            hitime_start(ht, t);
+
+            hitimestate_t state;
+            hitimestate_init(&state, 2);
+            check(!hitime_timeout_r(ht, &state, 0));
+
+            hitime_expire_all(ht);
+
+            check(t == hitime_get_next(ht));
+            check(NULL == hitime_get_next(ht));
+
+            hitimeout_free(&t);
         }
     }
 }

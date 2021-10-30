@@ -92,6 +92,7 @@ hitimeout_new(void)
 void
 hitimeout_free(hitimeout_t **t)
 {
+    hitimeout_destroy(*t);
     hitime_rawfree(*t);
     *t = NULL;
 }
