@@ -184,18 +184,6 @@ to_timeout(hitime_node_t *n)
     return n ? recover_ptr(n, hitimeout_t, node): NULL;
 }
 
-INLINE static int
-hitimeout_index(hitimeout_t *t)
-{
-    return t->index;
-}
-
-INLINE static void
-hitimeout_set_index(hitimeout_t *t, int index)
-{
-    t->index = index;
-}
-
 /*******************************************************************************
  * NODE FUNCTIONS
 *******************************************************************************/
@@ -322,7 +310,6 @@ ht_nq(hitime_t *h, hitimeout_t *t)
     }
 
     //binset_set(h, index);
-    hitimeout_set_index(t, index);
     list_nq(&h->bins[index], to_node(t));
 }
 
@@ -371,7 +358,6 @@ hitime_start(hitime_t * h, hitimeout_t *t)
      */
     if (UNLIKELY(is_expired(h, t)))
     {
-        hitimeout_set_index(t, EXPIRYINDEX);
         list_nq(ht_expiry(h), to_node(t));
     }
     else

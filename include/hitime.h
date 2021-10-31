@@ -43,7 +43,6 @@ typedef struct hitime_node_s
 typedef struct
 {
     hitime_node_t node;
-    uint32_t      index;
     int           type;
     uint64_t      when;
     void *        data;
