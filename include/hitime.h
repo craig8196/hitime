@@ -71,7 +71,11 @@ typedef struct
 {
     /* Internal */
     uint64_t      last;
+#if 0
+    // Performance testing indicates that this may be inefficient for
+    // large amounts of timeouts.
     uint32_t      binset; // which bins have hitimeouts, used for wait
+#endif
     hitime_node_t bins[HITIME_BINS];
 } hitime_t;
 

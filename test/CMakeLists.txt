@@ -13,6 +13,7 @@ endif()
 add_test(NAME prove COMMAND prove)
 
 add_executable(perform perform.c)
+set_source_files_properties(perform PROPERTIES COMPILE_FLAGS "-O2" )
 target_include_directories(perform PRIVATE ../include)
 target_link_libraries(perform PRIVATE hitime)
 add_test(NAME perform COMMAND perform)

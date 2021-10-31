@@ -96,9 +96,12 @@ static int MAXINDEX = 31;
 INLINE static int
 _pop32(uint32_t n)
 {
+    return __builtin_popcount(n);
+#if 0
     n = n - ((n >> 1) & 0x55555555);
     n = (n & 0x33333333) + ((n >> 2) & 0x33333333);
     return (((n + (n >> 4)) & 0x0F0F0F0F) * 0x01010101) >> 24;
+#endif
 }
 
 INLINE static int
@@ -113,8 +116,11 @@ is_expired(hitime_t *h, hitimeout_t *t)
 INLINE static int
 get_low_index(uint32_t n)
 {
+#if 0
     uint32_t m = n ^ (n - 1);
     return _pop32(m) - 1;
+#endif
+    return __builtin_ctz(n);
 }
 
 /**
@@ -123,12 +129,15 @@ get_low_index(uint32_t n)
 INLINE static int
 get_high_index(uint32_t n)
 {
+    return 31 - __builtin_clz(n);
+#if 0
     n |= n >> 1;
     n |= n >> 2;
     n |= n >> 4;
     n |= n >> 8;
     n |= n >> 16;
     return _pop32(n) - 1;
+#endif
 }
 
 INLINE static uint32_t
@@ -150,6 +159,7 @@ ht_process(hitime_t *h)
     return &h->bins[PROCESSINDEX];
 }
 
+#if 0
 INLINE static void
 binset_set(hitime_t *h, int index)
 {
@@ -167,6 +177,7 @@ binset_clear_all(hitime_t *h)
 {
     h->binset = 0;
 }
+#endif
 
 /*******************************************************************************
  * TIMEOUT FUNCTIONS
@@ -236,16 +247,15 @@ node_unlink(hitime_node_t *n)
 INLINE static hitime_node_t *
 list_dq(hitime_node_t *l)
 {
+    hitime_node_t *n = NULL;
+
     if (l != l->next)
     {
-        hitime_node_t *n = l->next;
+        n = l->next;
         node_unlink(n);
-        return n;
     }
-    else
-    {
-        return NULL;
-    }
+
+    return n;
 }
 
 INLINE static void
@@ -314,7 +324,7 @@ list_append(hitime_node_t *l1, hitime_node_t *l2)
  * HIGHTIME FUNCTIONS
 *******************************************************************************/
 
-INLINE static int
+INLINE static void
 ht_nq(hitime_t *h, hitimeout_t *t)
 {
     int index;
@@ -330,7 +340,7 @@ ht_nq(hitime_t *h, hitimeout_t *t)
         index = get_high_index((uint32_t)bits);
     }
 
-    binset_set(h, index);
+    //binset_set(h, index);
     hitimeout_set_index(t, index);
     list_nq(&h->bins[index], to_node(t));
 }
@@ -401,45 +411,72 @@ hitime_stop(hitime_t *h, hitimeout_t *t)
 {
     if (node_in_list(to_node(t)))
     {
+#if 0
         int index = hitimeout_index(t);
+#endif
         
         /* Unlink must happen or list is never empty. */
         node_unlink(to_node(t));
 
+#if 0
         if (list_empty(&h->bins[index]))
         {
             binset_clear(h, index);
         }
+#endif
     }
 }
 
 INLINE static int
 ht_get_wait(hitime_t *h)
 {
-    if (LIKELY(h->binset))
+    int wait = WAITMAX;
+
+    int index = 0;
+    for (; index < MAXINDEX; ++index)
+    {
+        if (list_has(h->bins + index))
+        {
+            uint32_t msb = 1 << index;
+            uint64_t mask = msb - 1;
+            uint32_t w = msb - (uint32_t)(mask & h->last);
+            wait = (int)w; // CAST: Okay because we restrict the size of index.
+
+            break;
+        }
+    }
+
+    return wait;
+#if 0
+    int wait = WAITMAX;
+
+    while (LIKELY(h->binset))
     {
         /* The time to wait is the distance to the lowest trigger point.
          * So we take the lowest bit set in binset and find the distance
          * from elapsed time to trigger that bin.
          */
         int index = get_low_index(h->binset);
-        if (LIKELY(index != MAXINDEX))
+        if (list_has(h->bins + index))
         {
-            uint32_t msb = 1 << index;
-            uint64_t mask = msb - 1;
-            uint32_t w = msb - (uint32_t)(mask & h->last);
-            return (int)w;
+            if (LIKELY(index != MAXINDEX))
+            {
+                uint32_t msb = 1 << index;
+                uint64_t mask = msb - 1;
+                uint32_t w = msb - (uint32_t)(mask & h->last);
+                wait = (int)w; // CAST: Okay because we restrict the size of index.
+            }
+
+            break;
         }
         else
         {
-            return (int)WAITMAX;
+            binset_clear(h, index);
         }
     }
-    else
-    {
-        /* There are no hitimeouts. Set to maximum. */
-        return (int)WAITMAX;
-    }
+
+    return wait;
+#endif
 }
 
 /**
@@ -477,7 +514,9 @@ ht_expire_first(hitime_t *h)
     {
         list_append(ht_expiry(h), h->bins);
         list_clear(h->bins);
+#if 0
         binset_clear(h, 0);
+#endif
     }
 }
 
@@ -508,7 +547,9 @@ ht_expire_bulk(hitime_t *h, uint64_t now)
         {
             list_append(ht_expiry(h), l);
             list_clear(l);
+#if 0
             binset_clear(h, index);
+#endif
         }
     }
 
@@ -539,7 +580,9 @@ ht_expire_individually_setup(hitime_t *h, int index, uint64_t now)
         {
             list_append(ht_process(h), l);
             list_clear(l);
+#if 0
             binset_clear(h, index);
+#endif
         }
     }
 }
@@ -620,6 +663,21 @@ hitime_timeout(hitime_t *h, uint64_t now)
 void
 hitime_expire_all(hitime_t * h)
 {
+    hitime_node_t *ls = h->bins;
+
+    int i;
+    for (i = 0; i < 32; ++i)
+    {
+        hitime_node_t *l = ls + i;
+        if (list_has(l))
+        {
+            list_append(ht_expiry(h), l);
+        }
+    }
+
+    // Clear all lists.
+    list_clear_all(ls, 32);
+#if 0
     if (h->binset)
     {
         hitime_node_t *ls = h->bins;
@@ -638,6 +696,7 @@ hitime_expire_all(hitime_t * h)
         list_clear_all(ls, 32);
         binset_clear_all(h);
     }
+#endif
 
     // Move everything from the process list to expiry.
     if (list_has(ht_process(h)))

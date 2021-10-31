@@ -17,7 +17,7 @@
 #endif
 
 #ifndef MAXLEN
-#define MAXLEN (1024*1024 * 16)
+#define MAXLEN (1024*1024 * 256)
 #endif
 
 
@@ -82,10 +82,11 @@ main(void)
 
     if (!seed)
     {
-        seed = rand();
+        seed = (int)time(0);
     }
 
     printf("Seed: %d\n", seed);
+    srand(seed);
 
     int iter = 0;
     for (iter = 0; iter < maxiter; ++iter)
