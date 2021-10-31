@@ -93,16 +93,15 @@ static int EXPIRYINDEX = 32;
 static int PROCESSINDEX = 33;
 static int MAXINDEX = 31;
 
+#if !(defined __GNUC__ && WORD_BIT == 32)
 INLINE static int
 _pop32(uint32_t n)
 {
-    return __builtin_popcount(n);
-#if 0
     n = n - ((n >> 1) & 0x55555555);
     n = (n & 0x33333333) + ((n >> 2) & 0x33333333);
     return (((n + (n >> 4)) & 0x0F0F0F0F) * 0x01010101) >> 24;
-#endif
 }
+#endif
 
 INLINE static int
 is_expired(hitime_t *h, hitimeout_t *t)
@@ -116,11 +115,12 @@ is_expired(hitime_t *h, hitimeout_t *t)
 INLINE static int
 get_low_index(uint32_t n)
 {
-#if 0
+#if defined __GNU__ && WORD_BIT == 32
+    return __builtin_ctz(n);
+#else
     uint32_t m = n ^ (n - 1);
     return _pop32(m) - 1;
 #endif
-    return __builtin_ctz(n);
 }
 
 /**
@@ -129,8 +129,9 @@ get_low_index(uint32_t n)
 INLINE static int
 get_high_index(uint32_t n)
 {
+#if defined __GNU__ && WORD_BIT == 32
     return 31 - __builtin_clz(n);
-#if 0
+#else
     n |= n >> 1;
     n |= n >> 2;
     n |= n >> 4;
@@ -158,26 +159,6 @@ ht_process(hitime_t *h)
 {
     return &h->bins[PROCESSINDEX];
 }
-
-#if 0
-INLINE static void
-binset_set(hitime_t *h, int index)
-{
-    h->binset = h->binset | (1 << index);
-}
-
-INLINE static void
-binset_clear(hitime_t *h, int index)
-{
-    h->binset = h->binset & ~(1 << index);
-}
-
-INLINE static void
-binset_clear_all(hitime_t *h)
-{
-    h->binset = 0;
-}
-#endif
 
 /*******************************************************************************
  * TIMEOUT FUNCTIONS
@@ -411,19 +392,8 @@ hitime_stop(hitime_t *h, hitimeout_t *t)
 {
     if (node_in_list(to_node(t)))
     {
-#if 0
-        int index = hitimeout_index(t);
-#endif
-        
         /* Unlink must happen or list is never empty. */
         node_unlink(to_node(t));
-
-#if 0
-        if (list_empty(&h->bins[index]))
-        {
-            binset_clear(h, index);
-        }
-#endif
     }
 }
 
@@ -447,36 +417,6 @@ ht_get_wait(hitime_t *h)
     }
 
     return wait;
-#if 0
-    int wait = WAITMAX;
-
-    while (LIKELY(h->binset))
-    {
-        /* The time to wait is the distance to the lowest trigger point.
-         * So we take the lowest bit set in binset and find the distance
-         * from elapsed time to trigger that bin.
-         */
-        int index = get_low_index(h->binset);
-        if (list_has(h->bins + index))
-        {
-            if (LIKELY(index != MAXINDEX))
-            {
-                uint32_t msb = 1 << index;
-                uint64_t mask = msb - 1;
-                uint32_t w = msb - (uint32_t)(mask & h->last);
-                wait = (int)w; // CAST: Okay because we restrict the size of index.
-            }
-
-            break;
-        }
-        else
-        {
-            binset_clear(h, index);
-        }
-    }
-
-    return wait;
-#endif
 }
 
 /**
@@ -514,9 +454,6 @@ ht_expire_first(hitime_t *h)
     {
         list_append(ht_expiry(h), h->bins);
         list_clear(h->bins);
-#if 0
-        binset_clear(h, 0);
-#endif
     }
 }
 
@@ -547,9 +484,6 @@ ht_expire_bulk(hitime_t *h, uint64_t now)
         {
             list_append(ht_expiry(h), l);
             list_clear(l);
-#if 0
-            binset_clear(h, index);
-#endif
         }
     }
 
@@ -580,9 +514,6 @@ ht_expire_individually_setup(hitime_t *h, int index, uint64_t now)
         {
             list_append(ht_process(h), l);
             list_clear(l);
-#if 0
-            binset_clear(h, index);
-#endif
         }
     }
 }
@@ -637,18 +568,6 @@ ht_update_last(hitime_t *h, uint64_t now)
 bool
 hitime_timeout(hitime_t *h, uint64_t now)
 {
-#if 0
-    // Make sure we're advancing time-wise.
-    if (now > h->last)
-    {
-        ht_expire_first(h);
-        int index = ht_expire_bulk(h, now);
-        ht_expire_individually_setup(h, index, now);
-        ht_update_last(h, now);
-        while (ht_expire_individually(h, INT_MAX));
-    }
-#endif
-
     hitimestate_t state;
     hitimestate_init(&state, now);
     while (!hitime_timeout_r(h, &state, INT_MAX));
@@ -677,26 +596,6 @@ hitime_expire_all(hitime_t * h)
 
     // Clear all lists.
     list_clear_all(ls, 32);
-#if 0
-    if (h->binset)
-    {
-        hitime_node_t *ls = h->bins;
-
-        int i;
-        for (i = 0; i < 32; ++i)
-        {
-            hitime_node_t *l = ls + i;
-            if (list_has(l))
-            {
-                list_append(ht_expiry(h), l);
-            }
-        }
-
-        // Clear all lists.
-        list_clear_all(ls, 32);
-        binset_clear_all(h);
-    }
-#endif
 
     // Move everything from the process list to expiry.
     if (list_has(ht_process(h)))
