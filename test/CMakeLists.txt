@@ -18,3 +18,9 @@ target_include_directories(perform PRIVATE ../include)
 target_link_libraries(perform PRIVATE hitime)
 add_test(NAME perform COMMAND perform)
 
+add_executable(cache cache_perf.c)
+set_source_files_properties(cache PROPERTIES COMPILE_FLAGS "-O2" )
+target_include_directories(cache PRIVATE ../include)
+target_link_libraries(cache PRIVATE hitime)
+add_test(NAME cache COMMAND cache)
+

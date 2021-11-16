@@ -109,31 +109,37 @@ main(void)
         // Time starts
         stopwatch_start(&sw);
 
+        // Start all timeouts
         for (toindex = 0; toindex < maxlen; ++toindex)
         {
             hitime_start(&ht, tos + toindex);
         }
 
+        // Time stops
         stopwatch_stop(&sw);
 
+        // Print stats
         printf("START STATS\n");
-        printf("Iterations: %d\n", maxiter);
+        printf("Iteration: %d (of %d)\n", iter, maxiter);
         double seconds = stopwatch_elapsed(&sw);
         printf("Seconds: %f\n", seconds);
         double ops_per_second = (double)maxlen / seconds;
         printf("Ops/second: %f\n", ops_per_second);
 
-        // Time stops
+        // Reset and start stopwatch
         stopwatch_reset(&sw);
         stopwatch_start(&sw);
 
+        // Stop all timeouts
         for (toindex = 0; toindex < maxlen; ++toindex)
         {
             hitime_stop(&ht, tos + toindex);
         }
 
+        // Time stops
         stopwatch_stop(&sw);
 
+        // Print stats
         printf("STOP STATS\n");
         printf("Iterations: %d\n", maxiter);
         seconds = stopwatch_elapsed(&sw);
