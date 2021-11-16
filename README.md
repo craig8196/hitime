@@ -8,6 +8,7 @@ Note that this library was renamed hitime, from hightime.
 - [Disclaimer](#disclaimer)
 - [Features](#features)
 - [Design](#design)
+- [Misc Notes](#misc-notes)
 - [Coding Standards](#coding-standards)
 - [Time Complexity](#time-complexity)
 - [Space Complexity](#space-complexity)
@@ -17,6 +18,7 @@ Note that this library was renamed hitime, from hightime.
 - [Compatibility](#compatibility)
 - [Demonstration](#demonstration)
 - [Reading Materials](#reading-materials)
+- [TODO](#todo)
 
 
 ## Note to the Reader | Disclaimer
@@ -66,14 +68,25 @@ As long as you are consistent, the framework doesn't care.
 This framework does require the following assumptions:
 1. Time is monotonically increasing.
 1. Timeouts are not greater than (2^(bits-1)) - 1 from the current time.
-   Note that I will probably be using 32 bits.
+   Note that I am using 32 bits/bins in the internal implementation.
    Note that this can be violated, but at a potential performance cost.
+   In milliseconds, this means don't have timeouts more than about 10 days out
+   (if I recall correctly).
 1. All time is of the same granularity (you must make any conversions).
 
 The peculiar design of this tool is so it could be tested quickly and reliably.
 This is why the user must pass in the current time.
 The user may call `hitime_timeout` at any time to force an update;
 although, this function may take some time to execute.
+
+
+## Misc Notes
+<a name="misc-notes" />
+
+While doing some primitive bench-marking I got an increase in performance
+of 40% between the `perform.c` benchmark
+and the cache-friendly `cache-perf.c` benchmark.
+Your mileage will vary, but just a ballpark figure for you.
 
 
 ## Coding Standards
@@ -129,6 +142,7 @@ It is recommended to wrap the functions so you don't make a mistake.
 1. Start:
 
         hitimeout_t *t = hitimeout_new();
+        hitimeout_set(t, 0, hitime_now_ms(), 0);
         hitime_start(&ht, t);
 
 1. Stop:
@@ -141,7 +155,7 @@ It is recommended to wrap the functions so you don't make a mistake.
         sleep_ms(wait);
         if (hitime_timeout(&ht, hitimeout_now_ms()))
         {
-            hitimeout_t t;
+            hitimeout_t *t;
             while ((t = hitime_get_next(&ht)))
             {
                 // process t
@@ -150,7 +164,7 @@ It is recommended to wrap the functions so you don't make a mistake.
 
 1. Destroy:
 
-        hitimeout_t t;
+        hitimeout_t *t;
         hitime_expire_all(&ht);
         while ((t = hitime_get_next(&ht)))
         {
@@ -392,4 +406,13 @@ George Varghese and Anthony Lack (1997).
 Hashed and Hierarchical Timing Wheels: Efficient Data Structures for
 Implementing a Timer Facility.
 (IEEE/ACM Transactions on Networking, Vol. 5, No.6, December 1997).
+
+
+## TODO
+<a name="todo" />
+
+* [ ] Add a function that updates the timeout stamp, hitime_touch
+* [ ] Add a function that will set the timeout expiry time to be within a given
+      range of time in the future so as to minimize the times the timeout
+      is placed in new bins. hitime_start_range
 
