@@ -149,6 +149,50 @@ spec("hitime library")
             hitimeout_free(&t);
         }
 
+        it("updates the timeout")
+        {
+            hitimeout_t *t = hitimeout_new();
+            hitimeout_set(t, 5, NULL, 1);
+
+            hitime_start(ht, t);
+            check(!hitime_timeout(ht, 4));
+            hitime_touch(ht, t, 6);
+            check(NULL == hitime_get_next(ht));
+            check(!hitime_timeout(ht, 5));
+            check(hitime_timeout(ht, 6));
+            check(t == hitime_get_next(ht));
+
+            hitimeout_free(&t);
+        }
+
+        it("updates the timeout when expired")
+        {
+            hitimeout_t *t = hitimeout_new();
+            hitimeout_set(t, 5, NULL, 1);
+
+            hitime_start(ht, t);
+            check(hitime_timeout(ht, 5));
+            hitime_touch(ht, t, 6);
+            check(NULL == hitime_get_next(ht));
+            check(hitime_timeout(ht, 6));
+            check(t == hitime_get_next(ht));
+
+            hitimeout_free(&t);
+        }
+
+        it("places timeout into expiry when updated with expired timestamp")
+        {
+            hitimeout_t *t = hitimeout_new();
+            hitimeout_set(t, 5, NULL, 1);
+
+            hitime_start(ht, t);
+            check(!hitime_timeout(ht, 4));
+            hitime_touch(ht, t, 4);
+            check(t == hitime_get_next(ht));
+
+            hitimeout_free(&t);
+        }
+
         it("should handle double start with no issue")
         {
             hitimeout_t *t = hitimeout_new();

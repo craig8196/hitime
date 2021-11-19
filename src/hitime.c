@@ -202,10 +202,16 @@ node_clear(hitime_node_t *n)
 }
 
 INLINE static void
-node_unlink(hitime_node_t *n)
+node_unlink_only(hitime_node_t *n)
 {
     n->next->prev = n->prev;
     n->prev->next = n->next;
+}
+
+INLINE static void
+node_unlink(hitime_node_t *n)
+{
+    node_unlink_only(n);
     node_clear(n);
 }
 
@@ -364,8 +370,6 @@ hitime_start(hitime_t * h, hitimeout_t *t)
     {
         ht_nq(h, t);
     }
-
-    /* Done */
 }
 
 /**
@@ -380,6 +384,32 @@ hitime_stop(hitime_t *h, hitimeout_t *t)
     {
         /* Unlink must happen or list is never empty. */
         node_unlink(to_node(t));
+    }
+}
+
+/**
+ * @param h
+ * @param t - Timeout to update.
+ * @param when - The new expiry timestamp.
+ * @brief Stop the timeout, if started, restart timeout.
+ */
+void
+hitime_touch(hitime_t *h, hitimeout_t *t, uint64_t when)
+{
+    t->when = when;
+
+    if (node_in_list(to_node(t)))
+    {
+        node_unlink_only(to_node(t));
+    }
+
+    if (UNLIKELY(is_expired(h, t)))
+    {
+        list_nq(ht_expiry(h), to_node(t));
+    }
+    else
+    {
+        ht_nq(h, t);
     }
 }
 

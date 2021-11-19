@@ -142,7 +142,7 @@ It is recommended to wrap the functions so you don't make a mistake.
 1. Start:
 
         hitimeout_t *t = hitimeout_new();
-        hitimeout_set(t, 0, hitime_now_ms(), 0);
+        hitimeout_set(t, hitime_now_ms(), NULL, 0);
         hitime_start(&ht, t);
 
 1. Stop:

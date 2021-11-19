@@ -88,6 +88,8 @@ void
 hitime_start(hitime_t *, hitimeout_t *);
 void
 hitime_stop(hitime_t *, hitimeout_t *);
+void
+hitime_touch(hitime_t *, hitimeout_t *, uint64_t);
 
 int
 hitime_get_wait(hitime_t *);
