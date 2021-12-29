@@ -374,6 +374,17 @@ hitime_start(hitime_t * h, hitimeout_t *t)
 
 /**
  * @param h
+ * @param t - Timeout to update.
+ * @param min - The minimum expiry time.
+ * @param max - The maximum expiry time.
+ */
+void
+hitime_start_range(hitime_t *h, hitimeout_t *t, uint64_t min, uint64_t max)
+{
+}
+
+/**
+ * @param h
  * @param t - The hitimeout to stop.
  * @brief Stop the timer by removing it from the datastructure.
  */
