@@ -411,7 +411,7 @@ Implementing a Timer Facility.
 ## TODO
 <a name="todo" />
 
-* [ ] Add a function that updates the timeout stamp, hitime_touch
+* [x] Add a function that updates the timeout stamp, hitime_touch
 * [ ] Add a function that will set the timeout expiry time to be within a given
       range of time in the future so as to minimize the times the timeout
       is placed in new bins. hitime_start_range
