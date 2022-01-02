@@ -113,20 +113,6 @@ is_expired(hitime_t *h, hitimeout_t *t)
  * @warn Do NOT call with zero.
  */
 INLINE static int
-get_low_index(uint32_t n)
-{
-#if defined __GNU__ && WORD_BIT == 32
-    return __builtin_ctz(n);
-#else
-    uint32_t m = n ^ (n - 1);
-    return _pop32(m) - 1;
-#endif
-}
-
-/**
- * @warn Do NOT call with zero.
- */
-INLINE static int
 get_high_index(uint32_t n)
 {
 #if defined __GNU__ && WORD_BIT == 32
@@ -373,6 +359,10 @@ hitime_start(hitime_t * h, hitimeout_t *t)
 }
 
 /**
+ * Set the timeout to be between the two values.
+ * Min and max must be within uint32_t of now.
+ * The objective is to minimize the number of times the
+ * timeout gets handled internally.
  * @param h
  * @param t - Timeout to update.
  * @param min - The minimum expiry time.
@@ -381,6 +371,12 @@ hitime_start(hitime_t * h, hitimeout_t *t)
 void
 hitime_start_range(hitime_t *h, hitimeout_t *t, uint64_t min, uint64_t max)
 {
+    uint64_t bits = max ^ min;
+    int index = get_high_index((uint32_t)bits);
+    uint64_t mask = ~((1 << index) - 1);
+    uint64_t newwhen = max & mask;
+    t->when = newwhen;
+    hitime_start(h, t);
 }
 
 /**
