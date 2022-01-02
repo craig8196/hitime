@@ -229,7 +229,7 @@ list_nq(hitime_node_t *l, hitime_node_t *n)
 }
 
 INLINE static bool
-list_empty(hitime_node_t *n)
+list_is_empty(hitime_node_t *n)
 {
     return (n == n->next);
 }
@@ -238,15 +238,6 @@ INLINE static bool
 list_has(hitime_node_t *n)
 {
     return (n != n->next);
-}
-
-INLINE static void
-list_move(hitime_node_t *dst, hitime_node_t *src)
-{
-    dst->next = src->next;
-    dst->prev = src->prev;
-    src->next->prev = dst;
-    src->prev->next = dst;
 }
 
 INLINE static void
@@ -595,7 +586,7 @@ hitime_timeout(hitime_t *h, uint64_t now)
     hitimestate_init(&state, now);
     while (!hitime_timeout_r(h, &state, INT_MAX));
 
-    return !list_empty(ht_expiry(h));
+    return !list_is_empty(ht_expiry(h));
 }
 
 /**
