@@ -87,6 +87,8 @@ hitime_destroy(hitime_t *);
 void
 hitime_start(hitime_t *, hitimeout_t *);
 void
+hitime_start_range(hitime_t *, hitimeout_t *, uint64_t, uint64_t);
+void
 hitime_stop(hitime_t *, hitimeout_t *);
 void
 hitime_touch(hitime_t *, hitimeout_t *, uint64_t);
