@@ -315,7 +315,7 @@ spec("hitime library")
             hitimeout_free(&t);
         }
 
-        it("should get proper wait time for wait with (white-box)")
+        it("should get proper wait time for get_wait_with (white-box)")
         {
             hitimeout_t *t = hitimeout_new();
 
@@ -330,6 +330,25 @@ spec("hitime library")
             check(2 == wait);
             wait = hitime_get_wait_with(ht, 4);
             check(0 == wait);
+
+            hitimeout_free(&t);
+        }
+
+        it("starts a timer in the given range")
+        {
+            hitimeout_t *t = hitimeout_new();
+
+            hitime_start_range(ht, t, 0, 1);
+            check(NULL == hitime_get_next(ht));
+            hitime_timeout(ht, 1);
+            check(t == hitime_get_next(ht));
+
+            hitime_start_range(ht, t, 0x0F, 0x10);
+            check(NULL == hitime_get_next(ht));
+            hitime_timeout(ht, 0x0F);
+            check(NULL == hitime_get_next(ht));
+            hitime_timeout(ht, 0x10);
+            check(t == hitime_get_next(ht));
 
             hitimeout_free(&t);
         }
