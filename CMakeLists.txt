@@ -1,7 +1,7 @@
 
 cmake_minimum_required(VERSION 3.16)
 enable_testing()
-project(hitime VERSION 0.0.1 DESCRIPTION "Heirarchical time management tool.")
+project(hitime VERSION 1.1.1 DESCRIPTION "Heirarchical timeout management tool.")
 
 include(GNUInstallDirs)
 
