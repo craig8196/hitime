@@ -145,6 +145,10 @@ It is recommended to wrap the functions so you don't make a mistake.
         hitimeout_set(t, hitime_now_ms(), NULL, 0);
         hitime_start(&ht, t);
 
+1. Start within a range:
+
+        hitime_start_range(&ht, t, 32, 64);
+
 1. Stop:
 
         hitime_stop(&ht, t);
@@ -413,6 +417,6 @@ Implementing a Timer Facility.
 
 * [x] Add a function that updates the timeout stamp, hitime_touch
 * [ ] Add a function that will set the timeout expiry time to be within a given
-      range of time in the future so as to minimize the times the timeout
-      is placed in new bins. hitime_start_range
+  range of time in the future so as to minimize the times the timeout
+  is placed in new bins. hitime_start_range
 
