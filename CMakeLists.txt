@@ -1,7 +1,11 @@
 
+set(TARGET_NAME hitime)
+set(SOURCES src/hitime.c src/hitime_extra.c)
+set(PUBLIC_INCLUDES include/hitime.h)
+
 cmake_minimum_required(VERSION 3.16)
 enable_testing()
-project(hitime VERSION 1.1.1 DESCRIPTION "Heirarchical timeout management tool.")
+project(${TARGET_NAME} VERSION 1.1.2 DESCRIPTION "Heirarchical timeout management tool.")
 
 include(GNUInstallDirs)
 
@@ -12,23 +16,23 @@ endif()
 
 add_subdirectory(test)
 
-set(SOURCES src/hitime.c src/hitime_extra.c)
 
-add_library(hitime SHARED ${SOURCES})
-set_target_properties(hitime PROPERTIES VERSION ${PROJECT_VERSION})
-set_target_properties(hitime PROPERTIES SOVERSION 0)
-set_target_properties(hitime PROPERTIES PUBLIC_HEADER include/hitime.h)
+add_library(${TARGET_NAME} STATIC ${SOURCES})
+set_target_properties(${TARGET_NAME} PROPERTIES VERSION ${PROJECT_VERSION})
+set_target_properties(${TARGET_NAME} PROPERTIES PUBLIC_HEADER ${PUBLIC_INCLUDES})
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_CXX_FLAGS_DEBUG "-O0")
 set(CMAKE_C_FLAGS_DEBUG "-O0")
 
-configure_file(hitime.pc.in hitime.pc @ONLY)
+target_compile_options(${TARGET_NAME} PRIVATE -Wall -Wextra -Wpedantic -Werror)
 
-target_include_directories(hitime PRIVATE include)
-target_include_directories(hitime PRIVATE src)
+configure_file("${TARGET_NAME}.pc.in" "${TARGET_NAME}.pc" @ONLY)
+
+target_include_directories(${TARGET_NAME} PRIVATE include)
+target_include_directories(${TARGET_NAME} PRIVATE src)
 
 if(CODE_COVERAGE)
-    target_code_coverage(hitime)
+    target_code_coverage(${TARGET_NAME})
 endif()
 
 if(BUILD_DOCUMENTATION)
@@ -39,13 +43,13 @@ if(BUILD_DOCUMENTATION)
     set(doxyfile ${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile)
     configure_file(${doxyfile_in} ${doxyfile} @ONLY)
     include(cmake-scripts/doxygen.cmake)
-    build_docs(ADD_TO_DOC hitime)
+    build_docs(ADD_TO_DOC ${TARGET_NAME})
 endif()
 
-install(TARGETS hitime
+install(TARGETS ${TARGET_NAME}
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
         PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
-install(FILES ${CMAKE_BINARY_DIR}/hitime.pc
+install(FILES ${CMAKE_BINARY_DIR}/${TARGET_NAME}.pc
         DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/pkgconfig)
 
 

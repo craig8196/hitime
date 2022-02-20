@@ -51,8 +51,9 @@ hitimeout_reset(hitimeout_t *t)
 }
 
 void
-hitimeout_destroy(hitimeout_t * UNUSED(t))
+hitimeout_destroy(hitimeout_t * t)
 {
+    hitime_memzero(t, sizeof(*t));
 }
 
 void
@@ -152,10 +153,7 @@ ht_process(hitime_t *h)
 
 #ifndef recover_ptr
 #define recover_ptr(p, type, field) \
-    ({ \
-        const typeof(((type *)0)->field) *__p = (p); \
-        (type *)((char *)__p - offsetof(type, field)); \
-    })
+    ((type *)((char *)(p) - offsetof(type, field)))
 #endif
 
 INLINE static hitime_node_t *
@@ -250,7 +248,7 @@ list_clear(hitime_node_t *n)
 INLINE static void
 list_clear_all(hitime_node_t *l, size_t num)
 {
-    int i;
+    size_t i;
     for (i = 0; i < num; ++i)
     {
         list_clear(l + i);
@@ -378,6 +376,9 @@ hitime_start_range(hitime_t *h, hitimeout_t *t, uint64_t min, uint64_t max)
 void
 hitime_stop(hitime_t *h, hitimeout_t *t)
 {
+    // Eradicate unused value message
+    h = h;
+
     if (node_in_list(to_node(t)))
     {
         /* Unlink must happen or list is never empty. */
@@ -645,7 +646,7 @@ enum hitimestate
 {
     HITIMESTATE_START = 0,
     HITIMESTATE_EXPIRE,
-    HITIMESTATE_DONE,
+    HITIMESTATE_DONE
 };
 
 void
