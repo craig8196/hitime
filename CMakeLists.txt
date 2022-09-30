@@ -5,7 +5,7 @@ set(PUBLIC_INCLUDES include/hitime.h)
 
 cmake_minimum_required(VERSION 3.16)
 enable_testing()
-project(${TARGET_NAME} VERSION 1.1.2 DESCRIPTION "Heirarchical timeout management tool.")
+project(${TARGET_NAME} VERSION 1.1.3 DESCRIPTION "Heirarchical timeout management tool.")
 
 include(GNUInstallDirs)
 

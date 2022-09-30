@@ -87,12 +87,12 @@ hitimeout_type(hitimeout_t *t)
  * HELPER FUNCTIONS
 *******************************************************************************/
 
-static uint64_t WAITMAX = INT_MAX;
-static uint64_t DELTMAX = INT_MAX;
-static uint32_t UPPERBIT = 0x80000000;
-static int EXPIRYINDEX = 32;
-static int PROCESSINDEX = 33;
-static int MAXINDEX = 31;
+static const uint64_t WAITMAX = INT_MAX;
+static const uint64_t DELTMAX = INT_MAX;
+static const uint32_t UPPERBIT = 0x80000000;
+static const int EXPIRYINDEX = 32;
+static const int PROCESSINDEX = 33;
+static const int MAXINDEX = 31;
 
 #if !(defined __GNUC__ && WORD_BIT == 32)
 INLINE static int
@@ -165,7 +165,7 @@ to_node(hitimeout_t *t)
 INLINE static hitimeout_t *
 to_timeout(hitime_node_t *n)
 {
-    return n ? recover_ptr(n, hitimeout_t, node): NULL;
+    return recover_ptr(n, hitimeout_t, node);
 }
 
 /*******************************************************************************
@@ -599,8 +599,9 @@ hitime_expire_all(hitime_t * h)
 {
     hitime_node_t *ls = h->bins;
 
+    // Iterate through core bins/lists.
     int i;
-    for (i = 0; i < 32; ++i)
+    for (i = 0; i < EXPIRYINDEX; ++i)
     {
         hitime_node_t *l = ls + i;
         if (list_has(l))
@@ -609,8 +610,8 @@ hitime_expire_all(hitime_t * h)
         }
     }
 
-    // Clear all lists.
-    list_clear_all(ls, 32);
+    // Clear all lists, but do not accidentally clear expiry list.
+    list_clear_all(ls, EXPIRYINDEX);
 
     // Move everything from the process list to expiry.
     if (list_has(ht_process(h)))
@@ -627,7 +628,8 @@ hitime_expire_all(hitime_t * h)
 hitimeout_t *
 hitime_get_next(hitime_t *h)
 {
-    return to_timeout(list_dq(ht_expiry(h)));
+    hitime_node_t *n = list_dq(ht_expiry(h));
+    return n ? to_timeout(n) : NULL;
 }
 
 uint64_t

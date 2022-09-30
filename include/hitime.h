@@ -43,9 +43,9 @@ typedef struct hitime_node_s
 typedef struct
 {
     hitime_node_t node;
-    int           type;
-    uint64_t      when;
     void *        data;
+    uint64_t      when;
+    int           type;
 } hitimeout_t;
 
 void
