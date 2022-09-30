@@ -3,6 +3,8 @@
 This is an implementation of a hierarchical timeout manager.
 Note that this library was renamed hitime, from hightime.
 
+EXPERIMENTAL! NOT YET PRODUCTION READY!
+
 
 ## Contents
 - [Disclaimer](#disclaimer)
@@ -416,7 +418,8 @@ Implementing a Timer Facility.
 <a name="todo" />
 
 * [x] Add a function that updates the timeout stamp, hitime_touch
-* [ ] Add a function that will set the timeout expiry time to be within a given
+* [x] Add a function that will set the timeout expiry time to be within a given
   range of time in the future so as to minimize the times the timeout
   is placed in new bins. hitime_start_range
+* [ ] More rigorous demonstrations for the core ideas and any associated testing
 
