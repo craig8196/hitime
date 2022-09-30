@@ -13,7 +13,7 @@
 #endif
 
 #ifndef MAXITER
-#define MAXITER (1)
+#define MAXITER (2)
 #endif
 
 #ifndef MAXLEN
@@ -141,7 +141,7 @@ main(void)
 
         // Print stats
         printf("STOP STATS\n");
-        printf("Iterations: %d\n", maxiter);
+        printf("Iteration: %d (of %d)\n", iter, maxiter);
         seconds = stopwatch_elapsed(&sw);
         printf("Seconds: %f\n", seconds);
         ops_per_second = (double)maxlen / seconds;
