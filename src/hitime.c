@@ -41,7 +41,11 @@
 void
 hitimeout_init(hitimeout_t *t)
 {
+#if 1
     hitime_memzero(t, sizeof(*t));
+#else
+    (*t) = (hitimeout_t){ 0 };
+#endif
 }
 
 void
@@ -53,7 +57,11 @@ hitimeout_reset(hitimeout_t *t)
 void
 hitimeout_destroy(hitimeout_t * t)
 {
+#if 1
     hitime_memzero(t, sizeof(*t));
+#else
+    (*t) = (hitimeout_t){ 0 };
+#endif
 }
 
 void
@@ -300,7 +308,11 @@ ht_nq(hitime_t *h, hitimeout_t *t)
 void
 hitime_init(hitime_t *h)
 {
+#if 1
+    h->last = 0;
+#else
     hitime_memzero(h, sizeof(*h));
+#endif
     list_clear_all(h->bins, HITIME_BINS);
 }
 
@@ -313,7 +325,11 @@ hitime_init(hitime_t *h)
 void
 hitime_destroy(hitime_t *h)
 {
+#if 1
     hitime_memzero(h, sizeof(*h));
+#else
+    (*h) = (hitime_t){ 0 };
+#endif
 }
 
 /**
