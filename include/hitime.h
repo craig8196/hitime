@@ -45,7 +45,6 @@ typedef struct
     hitime_node_t node;
     void *        data;
     uint64_t      when;
-    int           type;
 } hitimeout_t;
 
 void
@@ -55,13 +54,11 @@ hitimeout_reset(hitimeout_t *);
 void
 hitimeout_destroy(hitimeout_t *);
 void
-hitimeout_set(hitimeout_t *, uint64_t, void *, int);
+hitimeout_set(hitimeout_t *, uint64_t, void *);
 uint64_t
 hitimeout_when(hitimeout_t *);
 void *
 hitimeout_data(hitimeout_t *);
-int
-hitimeout_type(hitimeout_t *);
 
 /* sizeof(uint32_t)*8 + 1 for expiry + 1 for processing */
 #define HITIME_BINS (34)
@@ -122,6 +119,12 @@ void
 hitimestate_init(hitimestate_t *, uint64_t);
 bool
 hitime_timeout_r(hitime_t *, hitimestate_t *, int);
+
+/* Extra functions exposing functionaliy primarily for testing. */
+void
+hitime_expire_bin(hitime_t *h, int index);
+int
+hitime_count_bin(hitime_t *h, int index);
 
 
 #ifdef __cplusplus

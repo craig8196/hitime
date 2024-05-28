@@ -6,7 +6,7 @@
 #include <string.h>
 #include <time.h>
 
-#include "hitime_all.h"
+#include "hitime.h"
 
 #ifndef FORCESEED
 #define FORCESEED (0)
@@ -92,7 +92,7 @@ main(void)
 
     // Initialize data
     hitimeout_init(t);
-    hitimeout_set(t, rand64(), NULL, 0);
+    hitimeout_set(t, rand64(), NULL);
 
     // Time starts
     stopwatch_start(&sw);

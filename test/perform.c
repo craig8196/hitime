@@ -6,7 +6,8 @@
 #include <string.h>
 #include <time.h>
 
-#include "hitime_all.h"
+#include "hitime.h"
+#include "hitime_extra.h"
 
 #ifndef FORCESEED
 #define FORCESEED (0)
@@ -103,7 +104,7 @@ main(void)
         for (toindex = 0; toindex < maxlen; ++toindex)
         {
             hitimeout_init(tos + toindex);
-            hitimeout_set(tos + toindex, rand64(), NULL, 0);
+            hitimeout_set(tos + toindex, rand64(), NULL);
         }
 
         // Time starts

@@ -65,11 +65,10 @@ hitimeout_destroy(hitimeout_t * t)
 }
 
 void
-hitimeout_set(hitimeout_t *t, uint64_t when, void *data, int type)
+hitimeout_set(hitimeout_t *t, uint64_t when, void *data)
 {
     t->when = when;
     t->data = data;
-    t->type = type;
 }
 
 uint64_t
@@ -82,12 +81,6 @@ void *
 hitimeout_data(hitimeout_t *t)
 {
     return t->data;
-}
-
-int
-hitimeout_type(hitimeout_t *t)
-{
-    return t->type;
 }
 
 
@@ -136,6 +129,7 @@ get_high_index(uint32_t n)
 #endif
 }
 
+// TODO faster to take bitwise xor than comparison operator?
 INLINE static uint32_t
 get_elpased(uint64_t now, uint64_t last)
 {
@@ -263,7 +257,6 @@ list_clear_all(hitime_node_t *l, size_t num)
     }
 }
 
-
 /**
  * @brief Append items from l2 to l1.
  * @warn l2 cannot be empty.
@@ -276,6 +269,21 @@ list_append(hitime_node_t *l1, hitime_node_t *l2)
     l2->prev->next = l1;
     l1->prev->next = l2->next;
     l1->prev = l2->prev;
+}
+
+INLINE static int
+list_count(hitime_node_t *l)
+{
+    int count = 0;
+    hitime_node_t *next = l->next;
+
+    while (next != l)
+    {
+        ++count;
+        next = next->next;
+    }
+
+    return count;
 }
 
 /*******************************************************************************
@@ -372,6 +380,7 @@ hitime_start(hitime_t * h, hitimeout_t *t)
  * @param t - Timeout to update.
  * @param min - The minimum expiry time.
  * @param max - The maximum expiry time.
+ * @warn Max - min MUST be within uint32_t of now.
  */
 void
 hitime_start_range(hitime_t *h, hitimeout_t *t, uint64_t min, uint64_t max)
@@ -607,6 +616,44 @@ hitime_timeout(hitime_t *h, uint64_t now)
 }
 
 /**
+ * @brief Expire everything in the given bin. Mostly used in testing.
+ * @param h
+ * @param index - The index of the bin to expire.
+ */
+void
+hitime_expire_bin(hitime_t *h, int index)
+{
+    if (UNLIKELY(index < 0 || index > MAXINDEX))
+    {
+        return;
+    }
+
+    hitime_node_t *l = (h->bins) + index;
+    if (list_has(l))
+    {
+        list_append(ht_expiry(h), l);
+        list_clear(l);
+    }
+}
+
+/**
+ * @brief Counts the number of timeouts in a bin. Mostly used for testing.
+ * @param h
+ * @param index - The index of the bin to count.
+ * @return The count of items in the specified bin; zero on invalid bin.
+ */
+int
+hitime_count_bin(hitime_t *h, int index)
+{
+    if (UNLIKELY(index < 0 || index > MAXINDEX))
+    {
+        return 0;
+    }
+
+    return list_count((h->bins) + index);
+}
+
+/**
  * @brief Take all timers and put into expired.
  * @param h
  */
@@ -676,6 +723,8 @@ hitimestate_init(hitimestate_t *hts, uint64_t now)
 
 /**
  * @brief Process up to maxops of data.
+ *        Yes, I'm aware that I'm abusing "_r" semantics.
+ *        To be fair, most "_r" just mean thread-safe.
  * @warn If the overflow bin is being processed it cannot be interrupted.
  */
 bool
