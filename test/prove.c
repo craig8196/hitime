@@ -675,14 +675,40 @@ spec("hitime library")
     {
         it("should keep the order of timeouts when following the recommended timeout")
         {
+            // Set now to a random value
+            // Create list of timeouts less than 2 billion time units in the future
+            // Order the timeouts according to timeout
+            // Add all of the timeouts to the manager
+            // Follow the recommended timeout interval
+            // Iterate through the expiries and assert that they are in the same order
         }
 
         it("should timeout values correctly given reasonable increments")
         {
+            // Set now to a random value
+            // Create list of timeouts less than 2 billion time units in the future
+            // Create a reasonable interval
+            // Timeout every set interval and check that the items timeout once and correctly
+            // Verify that all timeouts where hit
         }
 
         it("should timeout values correctly given monotonicity isn\'t violated")
         {
+            // Set now to a random value
+            // Create list of timeouts less than 2 billion time units in the future
+            // Timeout one unit prior, verify no timeout occurred, timeout one unit next, and verify timeout
+            // Verify that all timeouts where hit
+        }
+
+        it("should place timeouts into the correct bins the correct number of times until expiry")
+        {
+            // For a set amount of iterations, do the following:
+            // Reset everything
+            // Set now to a random value
+            // Create a timeout value randomly
+            // Get a bit vector from now
+            // Add the timeout
+            // Check that it is in the correct bin at each timeout until expiry
         }
     }
 }
