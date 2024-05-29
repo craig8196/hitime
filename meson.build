@@ -9,6 +9,10 @@ incdir = include_directories('include')
 includes = files('include/hitime.h', 'include/hitime_extra.h')
 sources = files('src/hitime.c', 'src/hitime_extra.c')
 
+#hitime = static_library('hitime',
+#                 sources,
+#                 include_directories: incdir,
+#                 install: true)
 hitime = library('hitime',
                  sources,
                  include_directories: incdir,

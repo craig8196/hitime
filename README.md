@@ -138,9 +138,10 @@ Run `./build/prove` after building to run the tests.
 <a name="perf-notes" />
 
 While doing some primitive bench-marking I got an increase in performance
-of 40% between the `perform.c` benchmark
-and the cache-friendly `cache.c` benchmark.
+of 40% between the `perform.c` benchmark and the cache-friendly `cache.c` benchmark.
 Your mileage will vary, but just a ballpark figure for you.
+
+Linking against a static build of this library will further increase performance.
 
 
 ## Time Complexity
