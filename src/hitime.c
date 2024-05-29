@@ -129,7 +129,6 @@ get_high_index(uint32_t n)
 #endif
 }
 
-// TODO faster to take bitwise xor than comparison operator?
 INLINE static uint32_t
 get_elpased(uint64_t now, uint64_t last)
 {
