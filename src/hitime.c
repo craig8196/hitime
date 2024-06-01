@@ -34,6 +34,39 @@
 #include <stdlib.h>
 
 
+#if 0
+/*******************************************************************************
+ * INVARIANT FUNCTIONS
+*******************************************************************************/
+static bool
+check_list_integrity(hitime_node_t *l)
+{
+    if (NULL == l) { return false; }
+    if (NULL == l->next || NULL == l->prev) { return false; }
+
+    hitime_node_t *prev = l;
+    hitime_node_t *curr = l->next;
+
+    while (l != curr)
+    {
+        hitime_node_t *next = curr->next;
+        if (NULL == next) { return false; }
+        if (!(curr->prev == prev)) { return false; }
+        prev = curr;
+        curr = next;
+    }
+
+    return true;
+}
+
+static bool
+check_all_lists(hitime_t *h)
+{
+    return check_list_integrity(&h->expired);
+}
+#endif
+
+
 /*******************************************************************************
  * TIMEOUT FUNCTIONS
 *******************************************************************************/
@@ -41,11 +74,7 @@
 void
 hitimeout_init(hitimeout_t *t)
 {
-#if 1
-    hitime_memzero(t, sizeof(*t));
-#else
-    (*t) = (hitimeout_t){ 0 };
-#endif
+    (*t) = (const hitimeout_t){ 0 };
 }
 
 void
@@ -57,11 +86,7 @@ hitimeout_reset(hitimeout_t *t)
 void
 hitimeout_destroy(hitimeout_t * t)
 {
-#if 1
-    hitime_memzero(t, sizeof(*t));
-#else
-    (*t) = (hitimeout_t){ 0 };
-#endif
+    (*t) = (const hitimeout_t){ 0 };
 }
 
 void
@@ -88,22 +113,7 @@ hitimeout_data(hitimeout_t *t)
  * HELPER FUNCTIONS
 *******************************************************************************/
 
-static const uint64_t WAITMAX = INT_MAX;
-static const uint64_t DELTMAX = INT_MAX;
-static const uint32_t UPPERBIT = 0x80000000;
-static const int EXPIRYINDEX = 32;
-static const int PROCESSINDEX = 33;
-static const int MAXINDEX = 31;
-
-#if !(defined __GNUC__ && WORD_BIT == 32)
-INLINE static int
-_pop32(uint32_t n)
-{
-    n = n - ((n >> 1) & 0x55555555);
-    n = (n & 0x33333333) + ((n >> 2) & 0x33333333);
-    return (((n + (n >> 4)) & 0x0F0F0F0F) * 0x01010101) >> 24;
-}
-#endif
+static const uint64_t WAITMAX = UINT64_MAX;
 
 INLINE static int
 is_expired(hitime_t *h, hitimeout_t *t)
@@ -111,41 +121,58 @@ is_expired(hitime_t *h, hitimeout_t *t)
     return (t->when <= h->last);
 }
 
+#if !(defined __GNUC__)
+static const int8_t bits_to_log2[] =
+{
+    63, 0, 1, 52, 2, 6, 53, 26,
+    3, 37, 40, 7, 33, 54, 47, 27,
+    61, 4, 38, 45, 43, 41, 21, 8,
+    23, 34, 58, 55, 48, 17, 28, 10,
+    62, 51, 5, 25, 36, 39, 32, 46,
+    60, 44, 42, 20, 22, 57, 16, 9,
+    50, 24, 35, 31, 59, 19, 56, 15,
+    49, 30, 18, 14, 29, 13, 12, 11,
+};
+static const uint64_t bits_to_log2_multi = 0x022fdd63cc95386dULL;
+#endif
+
 /**
- * @warn Do NOT call with zero.
+ * @warn Do NOT input zero.
+ * @return The index of the highest set bit.
  */
 INLINE static int
-get_high_index(uint32_t n)
+get_high_index64(uint64_t n)
 {
-#if defined __GNU__ && WORD_BIT == 32
-    return 31 - __builtin_clz(n);
-#else
+#if !(defined __GNUC__)
     n |= n >> 1;
     n |= n >> 2;
     n |= n >> 4;
     n |= n >> 8;
     n |= n >> 16;
-    return _pop32(n) - 1;
+    n |= n >> 32;
+    n++;
+    return bits_to_log2[(n * bits_to_log2_multi) >> 58];
+#else
+    return 63 - __builtin_clzl(n);
 #endif
 }
 
-INLINE static uint32_t
+INLINE static uint64_t
 get_elpased(uint64_t now, uint64_t last)
 {
-    uint64_t d = now - last;
-    return d > DELTMAX ? UPPERBIT : (uint32_t)d;
+    return now - last;
 }
 
 INLINE static hitime_node_t *
-ht_expiry(hitime_t *h)
+ht_get_expired(hitime_t *h)
 {
-    return &h->bins[EXPIRYINDEX];
+    return &h->expired;
 }
 
 INLINE static hitime_node_t *
-ht_process(hitime_t *h)
+ht_get_processing(hitime_t *h)
 {
-    return &h->bins[PROCESSINDEX];
+    return &h->processing;
 }
 
 /*******************************************************************************
@@ -247,7 +274,7 @@ list_clear(hitime_node_t *n)
 }
 
 INLINE static void
-list_clear_all(hitime_node_t *l, size_t num)
+lists_clear(hitime_node_t *l, size_t num)
 {
     size_t i;
     for (i = 0; i < num; ++i)
@@ -258,16 +285,18 @@ list_clear_all(hitime_node_t *l, size_t num)
 
 /**
  * @brief Append items from l2 to l1.
- * @warn l2 cannot be empty.
- * @warn l2 is left in invalid state.
  */
 INLINE static void
 list_append(hitime_node_t *l1, hitime_node_t *l2)
 {
-    l2->next->prev = l1->prev;
-    l2->prev->next = l1;
-    l1->prev->next = l2->next;
-    l1->prev = l2->prev;
+    if (list_has(l2))
+    {
+        l2->next->prev = l1->prev;
+        l2->prev->next = l1;
+        l1->prev->next = l2->next;
+        l1->prev = l2->prev;
+        list_clear(l2);
+    }
 }
 
 INLINE static int
@@ -292,20 +321,9 @@ list_count(hitime_node_t *l)
 INLINE static void
 ht_nq(hitime_t *h, hitimeout_t *t)
 {
-    int index;
-
     /* Find which list to add the hitimeout to. */
     uint64_t bits = t->when ^ h->last;
-    if (UNLIKELY(bits > WAITMAX))
-    {
-        index = MAXINDEX;
-    }
-    else
-    {
-        index = get_high_index((uint32_t)bits);
-    }
-
-    //binset_set(h, index);
+    int index = get_high_index64(bits);
     list_nq(&h->bins[index], to_node(t));
 }
 
@@ -315,12 +333,10 @@ ht_nq(hitime_t *h, hitimeout_t *t)
 void
 hitime_init(hitime_t *h)
 {
-#if 1
     h->last = 0;
-#else
-    hitime_memzero(h, sizeof(*h));
-#endif
-    list_clear_all(h->bins, HITIME_BINS);
+    list_clear(&h->expired);
+    list_clear(&h->processing);
+    lists_clear(h->bins, HITIME_BINS);
 }
 
 /**
@@ -332,15 +348,12 @@ hitime_init(hitime_t *h)
 void
 hitime_destroy(hitime_t *h)
 {
-#if 1
-    hitime_memzero(h, sizeof(*h));
-#else
-    (*h) = (hitime_t){ 0 };
-#endif
+    (*h) = (const hitime_t){ 0 };
 }
 
 /**
  * @brief Add the hitimeout to the manager.
+ * @warn Remember to maintain referential stability! 'hitimeout_t' is a node internally!
  * @param h
  * @param t - The hitimeout to add.
  *
@@ -362,7 +375,7 @@ hitime_start(hitime_t * h, hitimeout_t *t)
      */
     if (UNLIKELY(is_expired(h, t)))
     {
-        list_nq(ht_expiry(h), to_node(t));
+        list_nq(ht_get_expired(h), to_node(t));
     }
     else
     {
@@ -372,21 +385,21 @@ hitime_start(hitime_t * h, hitimeout_t *t)
 
 /**
  * Set the timeout to be between the two values.
- * Min and max must be within uint32_t of now.
  * The objective is to minimize the number of times the
  * timeout gets handled internally.
  * @param h
  * @param t - Timeout to update.
- * @param min - The minimum expiry time.
- * @param max - The maximum expiry time.
- * @warn Max - min MUST be within uint32_t of now.
+ * @param min - The minimum expired time.
+ * @param max - The maximum expired time.
  */
 void
 hitime_start_range(hitime_t *h, hitimeout_t *t, uint64_t min, uint64_t max)
 {
-    uint64_t bits = max ^ min;
-    int index = get_high_index((uint32_t)bits);
-    uint64_t mask = ~((1 << index) - 1);
+    // TODO does this still work?? I'm not sure I implemented this correctly.
+    // TODO do some randomized testing
+    uint64_t bits = max ^ min; // TODO why am I not taking the difference at this step?
+    int index = get_high_index64(bits);
+    uint64_t mask = ~((((uint64_t)1) << index) - 1);
     uint64_t newwhen = max & mask;
     t->when = newwhen;
     hitime_start(h, t);
@@ -413,7 +426,7 @@ hitime_stop(hitime_t *h, hitimeout_t *t)
 /**
  * @param h
  * @param t - Timeout to update.
- * @param when - The new expiry timestamp.
+ * @param when - The new expired timestamp.
  * @brief Stop the timeout, if started, restart timeout.
  */
 void
@@ -428,7 +441,7 @@ hitime_touch(hitime_t *h, hitimeout_t *t, uint64_t when)
 
     if (UNLIKELY(is_expired(h, t)))
     {
-        list_nq(ht_expiry(h), to_node(t));
+        list_nq(ht_get_expired(h), to_node(t));
     }
     else
     {
@@ -436,21 +449,19 @@ hitime_touch(hitime_t *h, hitimeout_t *t, uint64_t when)
     }
 }
 
-INLINE static int
+INLINE static uint64_t
 ht_get_wait(hitime_t *h)
 {
-    int wait = WAITMAX;
+    uint64_t wait = WAITMAX;
 
     int index = 0;
-    for (; index < MAXINDEX; ++index)
+    for (; index < HITIME_BINS; ++index)
     {
-        if (list_has(h->bins + index))
+        if (list_has((h->bins) + index))
         {
-            uint32_t msb = 1 << index;
+            uint64_t msb = ((uint64_t)1) << index;
             uint64_t mask = msb - 1;
-            uint32_t w = msb - (uint32_t)(mask & h->last);
-            wait = (int)w; // CAST: Okay because we restrict the size of index.
-
+            wait = (mask - (mask & h->last)) + 1;
             break;
         }
     }
@@ -462,7 +473,7 @@ ht_get_wait(hitime_t *h)
  * @param h
  * @return The time to wait.
  */
-int
+uint64_t
 hitime_get_wait(hitime_t *h)
 {
     return ht_get_wait(h);
@@ -473,13 +484,12 @@ hitime_get_wait(hitime_t *h)
  * @param now - The current time.
  * @return The time to wait using the current now without updating.
  */
-int
+uint64_t
 hitime_get_wait_with(hitime_t *h, uint64_t now)
 {
     uint64_t diff = now - h->last;
     uint64_t w = ht_get_wait(h);
-    /* Note that w is <= INT_MAX, so the difference is in range(int). */
-    return diff < w ? (int)(w - diff) : 0;
+    return diff < w ? (w - diff) : 0;
 }
 
 /**
@@ -489,11 +499,7 @@ hitime_get_wait_with(hitime_t *h, uint64_t now)
 INLINE static void
 ht_expire_first(hitime_t *h)
 {
-    if(list_has(h->bins))
-    {
-        list_append(ht_expiry(h), h->bins);
-        list_clear(h->bins);
-    }
+    list_append(ht_get_expired(h), h->bins);
 }
 
 /**
@@ -504,7 +510,7 @@ INLINE static int
 ht_expire_bulk(hitime_t *h, uint64_t now)
 {
     int index = 1;
-    uint32_t elapsed = get_elpased(now, h->last);
+    uint64_t elapsed = get_elpased(now, h->last);
 
     /* NOTE:
      * If the elapsed time is less than the needed (wait time)
@@ -515,15 +521,11 @@ ht_expire_bulk(hitime_t *h, uint64_t now)
      */
 
     /* Get index of guaranteed expires. */
-    int index_max = get_high_index(elapsed);
+    int index_max = get_high_index64(elapsed);
     for (; index < index_max; ++index)
     {
         hitime_node_t *l = h->bins + index;
-        if (list_has(l))
-        {
-            list_append(ht_expiry(h), l);
-            list_clear(l);
-        }
+        list_append(ht_get_expired(h), l);
     }
 
     return index;
@@ -533,27 +535,15 @@ ht_expire_bulk(hitime_t *h, uint64_t now)
  * @return The max index of bins to review.
  */
 INLINE static void
-ht_expire_individually_setup(hitime_t *h, int index, uint64_t now)
+ht_process_setup(hitime_t *h, int index, uint64_t now)
 {
     uint64_t bits = now ^ h->last;
-    int max_index;
-    if (UNLIKELY(bits > WAITMAX))
-    {
-        max_index = MAXINDEX;
-    }
-    else
-    {
-        max_index = get_high_index((uint32_t)bits);
-    }
+    int max_index = get_high_index64(bits);
 
     for (; index <= max_index; ++index)
     {
         hitime_node_t *l = h->bins + index;
-        if (list_has(l))
-        {
-            list_append(ht_process(h), l);
-            list_clear(l);
-        }
+        list_append(ht_get_processing(h), l);
     }
 }
 
@@ -561,11 +551,11 @@ ht_expire_individually_setup(hitime_t *h, int index, uint64_t now)
  * @brief Check timeouts one-by-one and reassign to bins.
  */
 INLINE static int
-ht_expire_individually(hitime_t *h, int maxops)
+ht_process(hitime_t *h, int maxops)
 {
     int ops = 0;
 
-    hitime_node_t *l = ht_process(h);
+    hitime_node_t *l = ht_get_processing(h);
     if (list_has(l) && ops < maxops)
     {
         hitime_node_t *curr = l->next;
@@ -574,10 +564,11 @@ ht_expire_individually(hitime_t *h, int maxops)
             hitime_node_t *next = curr->next;
 
             hitimeout_t *t = to_timeout(curr);
+            //node_unlink_only(curr); // We don't need to null out pointers, they'll get set again.
             node_unlink(curr);
             if (UNLIKELY(is_expired(h, t)))
             {
-                list_nq(ht_expiry(h), curr);
+                list_nq(ht_get_expired(h), curr);
             }
             else
             {
@@ -592,6 +583,30 @@ ht_expire_individually(hitime_t *h, int maxops)
     return ops;
 }
 
+INLINE static void 
+ht_process_all(hitime_t *h)
+{
+    hitime_node_t *l = ht_get_processing(h);
+    hitime_node_t *curr = l->next;
+    while (curr != l)
+    {
+        hitime_node_t *next = curr->next;
+
+        hitimeout_t *t = to_timeout(curr);
+        if (UNLIKELY(is_expired(h, t)))
+        {
+            list_nq(ht_get_expired(h), curr);
+        }
+        else
+        {
+            ht_nq(h, t);
+        }
+
+        curr = next;
+    }
+    list_clear(l);
+}
+
 INLINE static void
 ht_update_last(hitime_t *h, uint64_t now)
 {
@@ -601,55 +616,57 @@ ht_update_last(hitime_t *h, uint64_t now)
 /**
  * @brief Move any expired hitimeouts to expired list.
  * @param h
+ * @param delta - The amount of time elapsed since the last time.
+ * @return False if nothing expired; true otherwise.
+ */
+bool
+hitime_timedelta(hitime_t *h, uint64_t delta)
+{
+    uint64_t now = h->last + delta;
+    if (now < h->last) { now = UINT64_MAX; }
+    return hitime_timeout(h, now);
+}
+
+/**
+ * @brief Move any expired hitimeouts to expired list.
+ * @param h
  * @param now - The current time.
- * @return True if there are expired timers.
+ * @return False if nothing expired (or invalid 'now' given); true otherwise.
  */
 bool
 hitime_timeout(hitime_t *h, uint64_t now)
 {
-    hitimestate_t state;
-    hitimestate_init(&state, now);
-    while (!hitime_timeout_r(h, &state, INT_MAX));
+    if (UNLIKELY(now <= h->last)) { return false; }
 
-    return !list_is_empty(ht_expiry(h));
+    ht_expire_first(h);
+    int index = ht_expire_bulk(h, now);
+    ht_process_setup(h, index, now);
+    ht_update_last(h, now);
+    ht_process_all(h);
+    return !list_is_empty(ht_get_expired(h));
 }
 
 /**
- * @brief Expire everything in the given bin. Mostly used in testing.
- * @param h
- * @param index - The index of the bin to expire.
+ * @brief Only re-process a certain amount of timers at a time.
+ *        This can help mitigate any concerns of the 'embarassing pause' problem.
+ *        However, the recommendation is to use 'hitime_timeout'.
+ * @warn Do NOT let significant amounts of time pass between iterations.
+ * @param now - The current time.
+ * @param max_ops - The maximum number of timers to place back into the queue.
+ * @return True if there are still items to process; false otherwise.
  */
-void
-hitime_expire_bin(hitime_t *h, int index)
+bool
+hitime_timeout_partial(hitime_t *h, uint64_t now, int max_ops)
 {
-    if (UNLIKELY(index < 0 || index > MAXINDEX))
+    if (now > h->last)
     {
-        return;
+        ht_expire_first(h);
+        int index = ht_expire_bulk(h, now);
+        ht_process_setup(h, index, now);
+        ht_update_last(h, now);
     }
-
-    hitime_node_t *l = (h->bins) + index;
-    if (list_has(l))
-    {
-        list_append(ht_expiry(h), l);
-        list_clear(l);
-    }
-}
-
-/**
- * @brief Counts the number of timeouts in a bin. Mostly used for testing.
- * @param h
- * @param index - The index of the bin to count.
- * @return The count of items in the specified bin; zero on invalid bin.
- */
-int
-hitime_count_bin(hitime_t *h, int index)
-{
-    if (UNLIKELY(index < 0 || index > MAXINDEX))
-    {
-        return 0;
-    }
-
-    return list_count((h->bins) + index);
+    ht_process(h, max_ops);
+    return !list_is_empty(ht_get_processing(h));
 }
 
 /**
@@ -660,27 +677,16 @@ void
 hitime_expire_all(hitime_t * h)
 {
     hitime_node_t *ls = h->bins;
-
     // Iterate through core bins/lists.
     int i;
-    for (i = 0; i < EXPIRYINDEX; ++i)
+    for (i = 0; i < HITIME_BINS; ++i)
     {
         hitime_node_t *l = ls + i;
-        if (list_has(l))
-        {
-            list_append(ht_expiry(h), l);
-        }
+        list_append(ht_get_expired(h), l);
     }
 
-    // Clear all lists, but do not accidentally clear expiry list.
-    list_clear_all(ls, EXPIRYINDEX);
-
-    // Move everything from the process list to expiry.
-    if (list_has(ht_process(h)))
-    {
-        list_append(ht_expiry(h), ht_process(h));
-        list_clear(ht_process(h));
-    }
+    // Move everything from the process list to expired.
+    list_append(ht_get_expired(h), ht_get_processing(h));
 }
 
 /**
@@ -690,7 +696,7 @@ hitime_expire_all(hitime_t * h)
 hitimeout_t *
 hitime_get_next(hitime_t *h)
 {
-    hitime_node_t *n = list_dq(ht_expiry(h));
+    hitime_node_t *n = list_dq(ht_get_expired(h));
     return n ? to_timeout(n) : NULL;
 }
 
@@ -706,71 +712,79 @@ hitime_get_last(hitime_t *h)
     return h->last;
 }
 
-enum hitimestate
-{
-    HITIMESTATE_START = 0,
-    HITIMESTATE_EXPIRE,
-    HITIMESTATE_DONE
-};
-
+/**
+ * @brief Expire everything in the given bin. Mostly used in testing.
+ * @param h
+ * @param index - The index of the bin to expire.
+ */
 void
-hitimestate_init(hitimestate_t *hts, uint64_t now)
+hitime_expire_bin(hitime_t *h, int index)
 {
-    hts->state = HITIMESTATE_START;
-    hts->now = now;
+    if (UNLIKELY(index < 0 || index >= HITIME_BINS))
+    {
+        return;
+    }
+
+    hitime_node_t *l = (h->bins) + index;
+    list_append(ht_get_expired(h), l);
 }
 
 /**
- * @brief Process up to maxops of data.
- *        Yes, I'm aware that I'm abusing "_r" semantics.
- *        To be fair, most "_r" just mean thread-safe.
- * @warn If the overflow bin is being processed it cannot be interrupted.
+ * @brief Counts the number of timeouts in a bin. Mostly used for testing.
+ * @param h
+ * @param index - The index of the bin to count.
+ * @return The count of items in the specified bin; zero on invalid bin.
  */
-bool
-hitime_timeout_r(hitime_t *h, hitimestate_t *hts, int maxops)
+int
+hitime_count_bin(hitime_t *h, int index)
 {
-    int ops = 0;
-
-    do
+    if (UNLIKELY(index < 0 || index >= HITIME_BINS))
     {
-        switch (hts->state)
-        {
-            case HITIMESTATE_START:
-                if (hts->now > h->last)
-                {
+        return 0;
+    }
 
-                    ht_expire_first(h);
-                    ++ops;
-                    int index = ht_expire_bulk(h, hts->now);
-                    ++ops;
-                    ht_expire_individually_setup(h, index, hts->now);
-                    ++ops;
-                    hts->state = HITIMESTATE_EXPIRE;
-                }
-                else
-                {
-                    hts->state = HITIMESTATE_DONE;
-                }
-                ht_update_last(h, hts->now);
-            break;
+    return list_count((h->bins) + index);
+}
 
-            case HITIMESTATE_EXPIRE:
-            {
-                int ops_done = ht_expire_individually(h, maxops - ops);
-                ops += ops_done;
-                if (!ops_done && ops < maxops)
-                {
-                    hts->state = HITIMESTATE_DONE;
-                }
-            }
-            break;
+/**
+ * @return The count of all timeouts in the datastructure, excluding expired.
+ */
+int
+hitime_count_all(hitime_t *h)
+{
+    int count = 0;
 
-            default:
-                hts->state = HITIMESTATE_DONE;
-            break;
-        }
-    } while (ops < maxops && !(hts->state == HITIMESTATE_DONE));
+    int i;
+    for (i = 0; i < HITIME_BINS; ++i)
+    {
+        count += list_count((h->bins) + i);
+    }
 
-    return (hts->state == HITIMESTATE_DONE);
+    return count;
+}
+
+/**
+ * @return The count of all timeouts in the expired list.
+ */
+int
+hitime_count_expired(hitime_t *h)
+{
+    return list_count(ht_get_expired(h));
+}
+
+/**
+ * Dumps the bin counts to stdout.
+ */
+void
+hitime_dump_stats(hitime_t *h)
+{
+    printf("NOW: %lu\nEXPIRED: %d\nPROCESSING: %d\nBINS:\n",
+           h->last, list_count(ht_get_expired(h)), list_count(ht_get_processing(h)));
+
+    int i;
+    for (i = 0; i < HITIME_BINS; ++i)
+    {
+        printf("%d: %d\n", i, list_count((h->bins) + i));
+    }
 }
 

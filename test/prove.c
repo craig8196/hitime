@@ -31,6 +31,14 @@
 
 #include <limits.h>
 #include <stdlib.h>
+#include <stdint.h>
+#include <stddef.h>
+#include <limits.h>
+
+
+#ifndef FORCESEED
+#define FORCESEED (0)
+#endif
 
 
 uint64_t
@@ -42,8 +50,39 @@ rand64(void)
     return ((uint64_t)arr[0] << 32) ^ (uint64_t)arr[1];
 }
 
+uint64_t
+rand64_limited(void)
+{
+    return (uint32_t)random() & (uint32_t)0x7FFFFFFF;
+}
+
+static int
+_sort_timeouts(const void *_a, const void *_b)
+{
+    hitimeout_t *a = *(hitimeout_t **)_a;
+    hitimeout_t *b = *(hitimeout_t **)_b;
+
+    if (a->when < b->when) { return -1; }
+    else if (a->when > b->when) { return 1; }
+    else if (a->data < b->data) { return -1; }
+    else if (a->data > b->data) { return 1; }
+    else { return 0; }
+}
+
+void
+sort_timeouts(hitimeout_t **t, int len)
+{
+    qsort(t, len, sizeof(*t), _sort_timeouts);
+}
+
 static hitime_t _ht;
 static hitime_t *ht = &_ht;
+
+static const int TSLEN = 128;
+static hitimeout_t *ts = NULL;
+static hitimeout_t **tss = NULL;
+
+static int randseed = 0;
 
 spec("hitime library")
 {
@@ -95,7 +134,7 @@ spec("hitime library")
 
         it("should return max wait (white-box)")
         {
-            check((uint64_t)INT_MAX == hitime_max_wait());
+            check(UINT64_MAX == hitime_max_wait());
         }
 
         it("should return max wait when no hitimeouts (white-box)")
@@ -265,6 +304,8 @@ spec("hitime library")
             check(30 == hitime_get_last(ht));
         }
 
+#if 0
+/* This was required for testing when the design was different. */
         it("should work with wait past recommended range (white-box)")
         {
             uint64_t max = hitime_max_wait();
@@ -296,6 +337,7 @@ spec("hitime library")
 
             hitimeout_free(&t);
         }
+#endif
         
         it("should bulk expire (code-coverage)")
         {
@@ -617,6 +659,7 @@ spec("hitime library")
         }
     }
 
+#if 0
     describe("re-entrant timeout with state")
     {
         before_each()
@@ -670,17 +713,104 @@ spec("hitime library")
             hitimeout_free(&t);
         }
     }
+#endif
 
     describe("randomized tests")
     {
+        before_each()
+        {
+            randseed = FORCESEED;
+            if (!randseed)
+            {
+                randseed = (int)rand64();
+                srand(randseed);
+                randseed = (int)rand64();
+            }
+            srand(randseed);
+
+            hitime_init(ht);
+            uint64_t now = rand64_limited();
+            hitime_timeout(ht, now);
+
+            // Create the list of random timeouts
+            ts = calloc(TSLEN, sizeof(hitimeout_t));
+            tss = calloc(TSLEN, sizeof(hitimeout_t *));
+            int i;
+            for (i = 0; i < TSLEN; ++i)
+            {
+                ts[i].when = now + rand64_limited();
+                ts[i].data = (void *)(intptr_t)i;
+                tss[i] = ts + i;
+            }
+        }
+
+        after_each()
+        {
+            hitime_destroy(ht);
+            free(ts);
+            free(tss);
+            ts = NULL;
+            tss = NULL;
+        }
+
         it("should keep the order of timeouts when following the recommended timeout")
         {
+            hitimeout_t *t;
+            int count;
+
             // Set now to a random value
-            // Create list of timeouts less than 2 billion time units in the future
-            // Order the timeouts according to timeout
+            // Create list of timeouts less than ~2 billion time units in the future
+
             // Add all of the timeouts to the manager
+            int i;
+            for (i = 0; i < TSLEN; ++i)
+            {
+                hitime_start(ht, tss[i]);
+            }
+            count = hitime_count_all(ht);
+            check(TSLEN == count, "Start Count - Actual: %d, Expected: %d", count, TSLEN);
+
             // Follow the recommended timeout interval
+            int max_calls = TSLEN * 64;
+            i = 0;
+            uint64_t max = hitime_max_wait();
+            uint64_t wait = hitime_get_wait(ht);
+            //printf("Max: %lu, %lx\n", max, max);
+            while (i < max_calls && wait < max)
+            {
+                hitime_timedelta(ht, wait);
+                ++i;
+                wait = hitime_get_wait(ht);
+            }
+            check(i < max_calls, "Too many iterations; Iterations: %d, Max: %d", i, max_calls);
+            count = hitime_count_expired(ht);
+            check(TSLEN == count, "Expired Count - Actual: %d, Expected: %d", count, TSLEN);
+
+            // Sort timeouts, check that the last timeout is the last time
+            // WARN: Stable sort required!
+            sort_timeouts(tss, TSLEN);
+            t = tss[0];
+            //printf("Min: %lu, %lx\n", t->when, t->when);
+            t = tss[TSLEN - 1];
+            //printf("Max: %lu, %lx\n", t->when, t->when);
+            check(hitime_get_last(ht) == t->when);
+
             // Iterate through the expiries and assert that they are in the same order
+            i = 0;
+            for (i = 0; i < TSLEN; ++i)
+            {
+                t = hitime_get_next(ht);
+                check(NULL != t);
+#if 0
+                printf("Found:  %lu, %lx\n", t->when, t->when);
+                t = hitime_get_next(ht);
+                check(NULL != t);
+                printf("Next: %lu, %lx\n", t->when, t->when);
+                printf("Expect: %lu, %lx\n", (tss[i])->when, (tss[i])->when);
+#endif
+                check(t == (tss[i]), "INDEX: %d, SEED: %d", i, randseed);
+            }
+            check(NULL == hitime_get_next(ht));
         }
 
         it("should timeout values correctly given reasonable increments")

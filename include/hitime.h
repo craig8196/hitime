@@ -61,17 +61,14 @@ void *
 hitimeout_data(hitimeout_t *);
 
 /* sizeof(uint32_t)*8 + 1 for expiry + 1 for processing */
-#define HITIME_BINS (34)
+#define HITIME_BINS (64)
 
 typedef struct
 {
     /* Internal */
-    uint64_t      last;
-#if 0
-    // Performance testing indicates that this may be inefficient for
-    // large amounts of timeouts.
-    uint32_t      binset; // which bins have hitimeouts, used for wait
-#endif
+    uint64_t      last;//last time given
+    hitime_node_t expired;
+    hitime_node_t processing;
     hitime_node_t bins[HITIME_BINS];
 } hitime_t;
 
@@ -90,12 +87,16 @@ hitime_stop(hitime_t *, hitimeout_t *);
 void
 hitime_touch(hitime_t *, hitimeout_t *, uint64_t);
 
-int
+uint64_t
 hitime_get_wait(hitime_t *);
-int
+uint64_t
 hitime_get_wait_with(hitime_t *, uint64_t);
 bool
+hitime_timedelta(hitime_t *, uint64_t);
+bool
 hitime_timeout(hitime_t *, uint64_t);
+bool
+hitime_timeout_partial(hitime_t *, uint64_t, int);
 
 void
 hitime_expire_all(hitime_t *);
@@ -107,24 +108,16 @@ uint64_t
 hitime_max_wait(void);
 uint64_t
 hitime_get_last(hitime_t *);
-
-/* State management for partial timeout calls. */
-typedef struct
-{
-    int      state;
-    uint64_t now;
-} hitimestate_t;
-
 void
-hitimestate_init(hitimestate_t *, uint64_t);
-bool
-hitime_timeout_r(hitime_t *, hitimestate_t *, int);
-
-/* Extra functions exposing functionaliy primarily for testing. */
-void
-hitime_expire_bin(hitime_t *h, int index);
+hitime_expire_bin(hitime_t *, int);
 int
-hitime_count_bin(hitime_t *h, int index);
+hitime_count_bin(hitime_t *, int);
+int
+hitime_count_all(hitime_t *);
+int
+hitime_count_expired(hitime_t *);
+void
+hitime_dump_stats(hitime_t *);
 
 
 #ifdef __cplusplus

@@ -9,16 +9,17 @@ incdir = include_directories('include')
 includes = files('include/hitime.h', 'include/hitime_extra.h')
 sources = files('src/hitime.c', 'src/hitime_extra.c')
 
-#hitime = static_library('hitime',
+# Expected use-case is to build against static library.
+hitime = static_library('hitime',
+                        sources,
+                        include_directories: incdir,
+                        install: true)
+#hitime = library('hitime',
 #                 sources,
 #                 include_directories: incdir,
+#                 version: version,
+#                 soversion: '1',
 #                 install: true)
-hitime = library('hitime',
-                 sources,
-                 include_directories: incdir,
-                 version: version,
-                 soversion: '1',
-                 install: true)
 install_headers(includes, subdir: 'hitime')
 
 # Unit tests

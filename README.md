@@ -24,6 +24,7 @@ This manager is hierarchical and operates on powers of two.
 - [Time Complexity](#time-complexity)
 - [Space Complexity](#space-complexity)
 - [Coding Standards](#coding-standards)
+- [Edge-Cases](#edge-cases)
 - [Terms](#terms)
 - [Features](#features)
 - [Design](#design)
@@ -127,6 +128,9 @@ meson setup build && cd build/ && meson compile
 TODO add code coverage generation
 ```
 
+Note that the default build creates a static library.
+This is because timeout management libraries tend to be specialized and are not commonly needed for most projects.
+
 
 ## Testing
 <a name="testing" />
@@ -140,8 +144,6 @@ Run `./build/prove` after building to run the tests.
 While doing some primitive bench-marking I got an increase in performance
 of 40% between the `perform.c` benchmark and the cache-friendly `cache.c` benchmark.
 Your mileage will vary, but just a ballpark figure for you.
-
-Linking against a static build of this library will further increase performance.
 
 
 ## Time Complexity
@@ -166,9 +168,12 @@ The following will need to be vetted, but...
 <a name="space-complexity" />
 
 Each struct is fixed and space complexity only grows linearly with the number of timeouts.
-Each `hitimeout_t` is roughly 36 octets on a 64-bit system.
-The `hitime_t` struct is about 544 octets (33\*2\*8 + 8 + 2\*4) on a 64-bit system.
-Needless to say this does not nicely fit on a 64 octet cache line.
+Each `hitimeout_t` is roughly 32 octets on a 64-bit system.
+The `hitime_t` struct is about 1048 octets (8 + 8 + 64\*2\*8) on a 64-bit system.
+Needless to say this is a bit large for my tastes.
+The size can be adjusted by customizing the internal data-structure according to constraints that you can enforce.
+
+The size of each `hitimeout_t` can be reduced by making the data implicit by embedding the struct and recovering the pointer to your data type later.
 
 
 ## Coding Standards
@@ -176,6 +181,15 @@ Needless to say this does not nicely fit on a 64 octet cache line.
 
 I loosely follow the Barr Group coding standards.
 I find their standards a good basis for C programming.
+
+
+## Edge-Cases
+<a name="edge-cases" />
+
+Really, the biggest edge-case to be aware of is the end-of-time.
+Since I'm using 64 bit unsigned integers to represent time, this should be difficult to hit for most users.
+The behavior is that you'll probably end up wrapping your timeouts via integer overflow to lower values.
+If this happens then your timeouts will automatically be expired upon trying to start them.
 
 
 ## Terms
@@ -267,6 +281,8 @@ The idea is that once a certain amount of time elapses, bins get triggered.
 When a bin is triggered the timeouts get reassigned to lower bins until expiry.
 Bins get triggered when the bin's corresponding bit in the timeout gets flipped.
 Alternatively if a bit of a bucket larger is flipped, all the lesser buckets get visited.
+
+TODO revise this section on the discussion of demonstration and overflow bins that are now unnecessary
 
 The reason for the (2^(bits-1)) - 1 limit on the timeout is to better handle overflow.
 The addition of any two numbers cannot exceed the maximum degree of the
@@ -450,14 +466,7 @@ Hashed and Hierarchical Timing Wheels: Efficient Data Structures for Implementin
 ## TODO
 <a name="todo" />
 
+- [ ] Upgrade to using 64 bins!!! There are some nasty consequences for the overflow bins, especially when things are on the boundaries.
 - [ ] Search for any similarly designed libraries/tools.
-- [ ] A function that allows the user to guarantee the next timeout interval.
-      Then incoming timeouts can be placed into more optimal bins.
-      I wish I recorded more of my thoughts here so I could remember what I was thinking about...
-      Oh, telling the manager when the next timeout occurs will allow you to use a lower bin and fewer tests to move timeouts up the queue.
-      You could subtract the difference of the incoming timeouts, then place them according to a different "now".
 - [ ] More rigorous demonstrations for the core ideas and any associated testing
-- [ ] Test behavior at the end-of-time.
-- [ ] Add method to timeout an entire bin.
-- [ ] Add method to count an entire bin, good for priority usages and testing.
 
