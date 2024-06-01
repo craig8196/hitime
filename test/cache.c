@@ -112,8 +112,8 @@ main(void)
     printf("START/STOP STATS\n");
     double seconds = stopwatch_elapsed(&sw);
     printf("Seconds: %f\n", seconds);
-    double ops_per_second = ((double)maxiter * 2) / seconds;
-    printf("Start and stop ops/second: %f\n", ops_per_second);
+    double ops_per_second = ((double)maxiter) / seconds;
+    printf("Start then stop ops/second: %f\n", ops_per_second);
 
     // Destroy data
     hitimeout_destroy(t);
