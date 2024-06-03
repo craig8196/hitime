@@ -209,8 +209,12 @@ node_in_list(hitime_node_t *n)
 INLINE static void
 node_clear(hitime_node_t *n)
 {
+#if 0
     n->next = NULL;
     n->prev = NULL;
+#else
+    (*n) = (const hitime_node_t){ 0 };
+#endif
 }
 
 INLINE static void

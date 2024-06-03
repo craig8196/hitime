@@ -33,7 +33,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stddef.h>
-#include <limits.h>
+#include <time.h>
 
 
 #ifndef FORCESEED
@@ -722,9 +722,7 @@ spec("hitime library")
             randseed = FORCESEED;
             if (!randseed)
             {
-                randseed = (int)rand64();
-                srand(randseed);
-                randseed = (int)rand64();
+                randseed = (int)time(0);
             }
             srand(randseed);
 
@@ -815,30 +813,152 @@ spec("hitime library")
 
         it("should timeout values correctly given reasonable increments")
         {
+            hitimeout_t *t, *actual, *expected;
+            int count;
+
             // Set now to a random value
-            // Create list of timeouts less than 2 billion time units in the future
+            // Create list of timeouts less than ~2 billion time units in the future
+
+            // Add all of the timeouts to the manager
+            int i;
+            for (i = 0; i < TSLEN; ++i)
+            {
+                hitime_start(ht, tss[i]);
+            }
+            count = hitime_count_all(ht);
+            check(TSLEN == count, "Start Count - Actual: %d, Expected: %d", count, TSLEN);
+
             // Create a reasonable interval
+            sort_timeouts(tss, TSLEN);
+            t = tss[TSLEN - 1];
+            uint64_t interval = (t->when - tss[0]->when) / 10;
+            if (!interval) { interval = 1; }
+            hitimeout_t **actuals = calloc(sizeof(hitimeout_t *), TSLEN);
+            int actuals_len = 0;
+            int expected_index = 0;
+
             // Timeout every set interval and check that the items timeout once and correctly
+            int interval_count = 0;
+            int timed_out = 0;
+            for (; interval_count < 12; ++interval_count)
+            {
+                actuals_len = 0;
+
+                // Record the timeouts that actually timed out
+                hitime_timedelta(ht, interval);
+                while (NULL != (t = hitime_get_next(ht)))
+                {
+                    actuals[actuals_len++] = t;
+                    ++timed_out;
+                }
+
+                // Sort them and compare against the actuals
+                sort_timeouts(actuals, actuals_len);
+                i = 0;
+                for (i = 0; i < actuals_len; ++i)
+                {
+                    expected = tss[expected_index];
+                    actual = actuals[i];
+
+                    check(actual == expected);
+
+                    ++expected_index;
+                }
+            }
+
             // Verify that all timeouts where hit
+            check(timed_out == TSLEN);
+
+            free(actuals);
         }
 
         it("should timeout values correctly given monotonicity isn\'t violated")
         {
+            hitimeout_t *t;
+
             // Set now to a random value
             // Create list of timeouts less than 2 billion time units in the future
+            uint64_t now = hitime_get_last(ht);
+
             // Timeout one unit prior, verify no timeout occurred, timeout one unit next, and verify timeout
-            // Verify that all timeouts where hit
+            int i;
+            for (i = 0; i < TSLEN; ++i)
+            {
+                t = tss[i];
+                hitime_start(ht, t);
+                hitime_timeout(ht, t->when - 1);
+                check(hitime_count_expired(ht) == 0);
+                hitime_timedelta(ht, 1);
+                check(hitime_count_expired(ht) == 1);
+                hitime_destroy(ht);
+                hitime_init(ht);
+                hitime_timeout(ht, now);
+            }
         }
 
-        it("should place timeouts into the correct bins the correct number of times until expiry")
+        it("should place timeouts into the correct bins the correct number of times until expiry (white-box)")
         {
+            hitimeout_t *t;
+
             // For a set amount of iterations, do the following:
             // Reset everything
+
             // Set now to a random value
-            // Create a timeout value randomly
-            // Get a bit vector from now
-            // Add the timeout
-            // Check that it is in the correct bin at each timeout until expiry
+            uint64_t now = hitime_get_last(ht);
+
+            int i;
+            for (i = 0; i < TSLEN; ++i)
+            {
+                // Create a timeout value randomly
+                t = tss[i];
+
+                // Get a bit vector from now
+                uint64_t bits = t->when ^ now;
+
+                // Add the timeout
+                hitime_start(ht, t);
+
+                int bit_index = 63 - __builtin_clzll(bits);
+
+                bool is_first_iter = true;
+
+                //printf("Index: %d, Now: %lx, Timeout: %lx\n", i, now, t->when);
+                // Check that it is in the correct bin at each timeout until expiry
+                while (bits)
+                {
+#if 0
+                    uint64_t newbits = hitime_get_last(ht) ^ t->when;
+                    printf("P: %d, C: %d, N: %d, Bits: %lx, Bit Index: %d, New Bits: %lx\n",
+                           hitime_count_bin(ht, bit_index - 1),
+                           hitime_count_bin(ht, bit_index),
+                           hitime_count_bin(ht, bit_index + 1),
+                           bits, bit_index, newbits
+                           );
+#endif
+                    check(hitime_count_bin(ht, bit_index) == 1,
+                          "Bit check failed; Index: %d, Bits: %lx, Bit Index: %d", i, bits, bit_index);
+
+                    // Advance timeout.
+                    hitime_timedelta(ht, hitime_get_wait(ht));
+
+                    // All "now" bits to the right of the triggered will be zero.
+                    if (is_first_iter)
+                    {
+                        bits = hitime_get_last(ht) ^ t->when;
+                        is_first_iter = false;
+                    }
+
+                    // Clear bit
+                    bits = bits & ~(((uint64_t)1) << bit_index);
+                    bit_index = 63 - __builtin_clzll(bits);
+                }
+                //check(false);
+                check(hitime_count_expired(ht) == 1);
+
+                hitime_destroy(ht);
+                hitime_init(ht);
+                hitime_timeout(ht, now);
+            }
         }
     }
 }

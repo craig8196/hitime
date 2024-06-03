@@ -466,7 +466,6 @@ Hashed and Hierarchical Timing Wheels: Efficient Data Structures for Implementin
 ## TODO
 <a name="todo" />
 
-- [ ] Upgrade to using 64 bins!!! There are some nasty consequences for the overflow bins, especially when things are on the boundaries.
-- [ ] Search for any similarly designed libraries/tools.
+- [ ] Search (again) for any similarly designed libraries/tools.
 - [ ] More rigorous demonstrations for the core ideas and any associated testing
 
