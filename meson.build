@@ -3,7 +3,7 @@ project('hitime', 'c',
         license: 'MIT',
         license_files: 'LICENSE',
         version: '1.1.3')
-version = '1.1.3'
+version = meson.project_version()
 
 incdir = include_directories('include')
 includes = files('include/hitime.h', 'include/hitime_extra.h')
