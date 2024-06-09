@@ -399,9 +399,7 @@ hitime_start(hitime_t * h, hitimeout_t *t)
 void
 hitime_start_range(hitime_t *h, hitimeout_t *t, uint64_t min, uint64_t max)
 {
-    // TODO does this still work?? I'm not sure I implemented this correctly.
-    // TODO do some randomized testing
-    uint64_t bits = max ^ min; // TODO why am I not taking the difference at this step?
+    uint64_t bits = max ^ min;
     int index = get_high_index64(bits);
     uint64_t mask = ~((((uint64_t)1) << index) - 1);
     uint64_t newwhen = max & mask;
