@@ -399,10 +399,20 @@ hitime_start(hitime_t * h, hitimeout_t *t)
 void
 hitime_start_range(hitime_t *h, hitimeout_t *t, uint64_t min, uint64_t max)
 {
+    uint64_t newwhen;
     uint64_t bits = max ^ min;
-    int index = get_high_index64(bits);
-    uint64_t mask = ~((((uint64_t)1) << index) - 1);
-    uint64_t newwhen = max & mask;
+
+    if (LIKELY(bits))
+    {
+        int index = get_high_index64(bits);
+        uint64_t mask = ~((((uint64_t)1) << index) - 1);
+        newwhen = max & mask;
+    }
+    else
+    {
+        newwhen = max;
+    }
+
     t->when = newwhen;
     hitime_start(h, t);
 }

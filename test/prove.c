@@ -853,6 +853,39 @@ spec("hitime library")
                 hitime_timeout(ht, now);
             }
         }
+
+        it("should start a timer in the range given")
+        {
+            hitimeout_t local_timeout;
+            hitimeout_t *ranged = &local_timeout;
+            uint64_t low;
+            uint64_t mid;
+            uint64_t high;
+
+            sort_timeouts(tss, TSLEN);
+
+            int len = TSLEN < 128 ? TSLEN : 128;
+            int i;
+            for (i = 0; i < len; ++i)
+            {
+                int j;
+                for (j = i; j < len; ++j)
+                {
+                    hitimeout_init(ranged);
+                    low = hitimeout_when(tss[i]);
+                    high = hitimeout_when(tss[j]);
+
+                    check(low <= high);
+
+                    hitime_start_range(ht, ranged, low, high);
+                    mid = hitimeout_when(ranged);
+                    check(mid >= low);
+                    check(mid <= high);
+
+                    hitime_init(ht);
+                }
+            }
+        }
     }
 }
 
