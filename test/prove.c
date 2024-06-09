@@ -303,41 +303,6 @@ spec("hitime library")
             check(!hitime_timeout(ht, 30));
             check(30 == hitime_get_last(ht));
         }
-
-#if 0
-/* This was required for testing when the design was different. */
-        it("should work with wait past recommended range (white-box)")
-        {
-            uint64_t max = hitime_max_wait();
-
-            hitimeout_t *t = hitimeout_new();
-
-            hitimeout_set(t, max + 1, NULL);
-
-            hitime_start(ht, t);
-
-            check(max == (uint64_t)hitime_get_wait(ht));
-
-            uint64_t now = 0;
-
-            /* Using a for loop to avoid any infinite loop should the test fail.
-             */
-            int maxiter = 32;
-            int i;
-            bool done = false;
-            for (i = 0; i < maxiter && !done; ++i)
-            {
-                now += hitime_get_wait(ht);
-                done = hitime_timeout(ht, now);
-            }
-
-            check(done);
-            check(t == hitime_get_next(ht));
-            check(NULL == hitime_get_next(ht));
-
-            hitimeout_free(&t);
-        }
-#endif
         
         it("should bulk expire (code-coverage)")
         {
@@ -659,62 +624,6 @@ spec("hitime library")
         }
     }
 
-#if 0
-    describe("re-entrant timeout with state")
-    {
-        before_each()
-        {
-            hitime_init(ht);
-        }
-
-        after_each()
-        {
-            hitime_destroy(ht);
-        }
-
-        it("should switch to done with invalid state value (code-coverage)")
-        {
-            hitimestate_t state;
-            state.state = 20;
-
-            check(hitime_timeout_r(ht, &state, 0));
-        }
-
-        it("should switch to done with invalid time sequence (code-coverage)")
-        {
-            uint64_t now = 2;
-
-            hitime_timeout(ht, now);
-
-            now = 1;
-
-            hitimestate_t state;
-            hitimestate_init(&state, now);
-            check(hitime_timeout_r(ht, &state, 0));
-        }
-
-        it("should move unfinished timeout update items to expiry")
-        {
-            hitime_timeout(ht, 1);
-
-            hitimeout_t *t = hitimeout_new();
-            hitimeout_set(t, 2, NULL);
-            hitime_start(ht, t);
-
-            hitimestate_t state;
-            hitimestate_init(&state, 2);
-            check(!hitime_timeout_r(ht, &state, 0));
-
-            hitime_expire_all(ht);
-
-            check(t == hitime_get_next(ht));
-            check(NULL == hitime_get_next(ht));
-
-            hitimeout_free(&t);
-        }
-    }
-#endif
-
     describe("randomized tests")
     {
         before_each()
@@ -799,13 +708,6 @@ spec("hitime library")
             {
                 t = hitime_get_next(ht);
                 check(NULL != t);
-#if 0
-                printf("Found:  %lu, %lx\n", t->when, t->when);
-                t = hitime_get_next(ht);
-                check(NULL != t);
-                printf("Next: %lu, %lx\n", t->when, t->when);
-                printf("Expect: %lu, %lx\n", (tss[i])->when, (tss[i])->when);
-#endif
                 check(t == (tss[i]), "INDEX: %d, SEED: %d", i, randseed);
             }
             check(NULL == hitime_get_next(ht));
@@ -926,15 +828,6 @@ spec("hitime library")
                 // Check that it is in the correct bin at each timeout until expiry
                 while (bits)
                 {
-#if 0
-                    uint64_t newbits = hitime_get_last(ht) ^ t->when;
-                    printf("P: %d, C: %d, N: %d, Bits: %lx, Bit Index: %d, New Bits: %lx\n",
-                           hitime_count_bin(ht, bit_index - 1),
-                           hitime_count_bin(ht, bit_index),
-                           hitime_count_bin(ht, bit_index + 1),
-                           bits, bit_index, newbits
-                           );
-#endif
                     check(hitime_count_bin(ht, bit_index) == 1,
                           "Bit check failed; Index: %d, Bits: %lx, Bit Index: %d", i, bits, bit_index);
 
