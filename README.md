@@ -466,7 +466,5 @@ Hashed and Hierarchical Timing Wheels: Efficient Data Structures for Implementin
 ## TODO
 <a name="todo" />
 
-- [ ] Search (again) for any similarly designed libraries/tools.
-- [ ] More rigorous demonstrations for the core ideas and any associated testing
-- [ ] Add randomized, more rigorous, testing for start_range.
+- [ ] More rigorous proofs for the core ideas and any associated testing
 
