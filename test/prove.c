@@ -24,10 +24,8 @@
  * @author Craig Jacobson
  * @brief Demonstrate correctness of timeout manager.
  */
-
 #include "bdd.h"
 #include "hitime.h"
-#include "hitime_extra.h"
 
 #include <limits.h>
 #include <stdlib.h>

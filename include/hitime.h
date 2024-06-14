@@ -34,17 +34,26 @@ extern "C" {
 #include <stdbool.h>
 #include <stdint.h>
 
+#define HITIME_BINS (64)
+
+
+/* Node
+ * Used in the internal linked list.
+ */
 typedef struct hitime_node_s
 {
     struct hitime_node_s * next;
     struct hitime_node_s * prev;
 } hitime_node_t;
 
+/* Timeout
+ * Embedable struct to track timeouts.
+ */
 typedef struct
 {
     hitime_node_t node;
-    void *        data;
     uint64_t      when;
+    void *        data;
 } hitimeout_t;
 
 void
@@ -60,9 +69,9 @@ hitimeout_when(hitimeout_t *);
 void *
 hitimeout_data(hitimeout_t *);
 
-/* sizeof(uint32_t)*8 + 1 for expiry + 1 for processing */
-#define HITIME_BINS (64)
-
+/* HiTime Timeout Manager
+ * Stores timeouts until expiry.
+ */
 typedef struct
 {
     /* Internal */
@@ -102,6 +111,23 @@ void
 hitime_expire_all(hitime_t *);
 hitimeout_t *
 hitime_get_next(hitime_t *);
+
+/* Convenience functions for allocations and time. */
+hitimeout_t *
+hitimeout_new(void);
+void
+hitimeout_free(hitimeout_t **);
+
+hitime_t *
+hitime_new(void);
+void
+hitime_free(hitime_t * *);
+
+uint64_t
+hitime_now_ms(void);
+
+uint64_t
+hitime_now(void);
 
 /* Exports for testing. */
 uint64_t

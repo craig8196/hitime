@@ -6,8 +6,8 @@ project('hitime', 'c',
 version = meson.project_version()
 
 incdir = include_directories('include')
-includes = files('include/hitime.h', 'include/hitime_extra.h')
-sources = files('src/hitime.c', 'src/hitime_extra.c')
+includes = files('include/hitime.h')
+sources = files('src/hitime.c')
 
 # Expected use-case is to build against static library.
 hitime = static_library('hitime',

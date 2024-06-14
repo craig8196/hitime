@@ -23,15 +23,20 @@
  * @file hitime.c
  * @author Craig Jacobson
  * @brief Hierarchical hitimeout manager implementation.
+ *
+ * The CORE functions are everything up to the functions exposing
+ * internal functionality.
  */
 
-#include "hitime_util.h"
 #include "hitime.h"
+#include "hitime_util.h"
 
 #include <limits.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/time.h>
+#include <time.h>
 
 
 #if 0
@@ -559,42 +564,6 @@ ht_process_setup(hitime_t *h, int index, uint64_t now)
     }
 }
 
-/**
- * @brief Check timeouts one-by-one and reassign to bins.
- */
-INLINE static int
-ht_process(hitime_t *h, int maxops)
-{
-    int ops = 0;
-
-    hitime_node_t *l = ht_get_processing(h);
-    if (list_has(l) && ops < maxops)
-    {
-        hitime_node_t *curr = l->next;
-        while (curr != l && ops < maxops)
-        {
-            hitime_node_t *next = curr->next;
-
-            hitimeout_t *t = to_timeout(curr);
-            //node_unlink_only(curr); // We don't need to null out pointers, they'll get set again.
-            node_unlink(curr);
-            if (UNLIKELY(is_expired(h, t)))
-            {
-                list_nq(ht_get_expired(h), curr);
-            }
-            else
-            {
-                ht_nq(h, t);
-            }
-
-            ++ops;
-            curr = next;
-        }
-    }
-
-    return ops;
-}
-
 INLINE static void 
 ht_process_all(hitime_t *h)
 {
@@ -659,29 +628,6 @@ hitime_timeout(hitime_t *h, uint64_t now)
 }
 
 /**
- * @brief Only re-process a certain amount of timers at a time.
- *        This can help mitigate any concerns of the 'embarassing pause' problem.
- *        However, the recommendation is to use 'hitime_timeout'.
- * @warn Do NOT let significant amounts of time pass between iterations.
- * @param now - The current time.
- * @param max_ops - The maximum number of timers to place back into the queue.
- * @return True if there are still items to process; false otherwise.
- */
-bool
-hitime_timeout_partial(hitime_t *h, uint64_t now, int max_ops)
-{
-    if (now > h->last)
-    {
-        ht_expire_first(h);
-        int index = ht_expire_bulk(h, now);
-        ht_process_setup(h, index, now);
-        ht_update_last(h, now);
-    }
-    ht_process(h, max_ops);
-    return !list_is_empty(ht_get_processing(h));
-}
-
-/**
  * @brief Take all timers and put into expired.
  * @param h
  */
@@ -723,6 +669,123 @@ hitime_get_last(hitime_t *h)
 {
     return h->last;
 }
+
+/*******************************************************************************
+ * ALLOC FUNCTIONS
+*******************************************************************************/
+
+static void
+_hitime_abort(bool is_malloc, size_t size)
+{
+    const char msg[] = "hitime %salloc(%zu) failure";
+
+    /* The 2 is for the prefix "re".
+     * Note that 2**64 is actually 20 max chars, good to have space.
+     */
+    char buf[sizeof(msg) + 2 + 32];
+
+    snprintf(buf, sizeof(buf), msg, is_malloc ? "m" : "re", size);
+    perror(buf);
+    abort();
+}
+
+INLINE static void *
+_hitime_rawalloc_impl(size_t size)
+{
+    void *mem = malloc(size);
+    if (UNLIKELY(!mem))
+    {
+        _hitime_abort(true, size);
+    }
+    return mem;
+}
+
+/*
+ * Don't check for NULL since hitime_free does operations
+ * that would cause segfault anyways.
+ */
+INLINE static void
+_hitime_rawfree_impl(void *mem)
+{
+    free(mem);
+}
+
+
+/*******************************************************************************
+ * TIMEOUT FUNCTIONS
+*******************************************************************************/
+
+hitimeout_t *
+hitimeout_new(void)
+{
+    hitimeout_t *t = hitime_rawalloc(sizeof(hitimeout_t));
+    hitimeout_init(t);
+    return t;
+}
+
+void
+hitimeout_free(hitimeout_t **t)
+{
+    hitimeout_destroy(*t);
+    hitime_rawfree(*t);
+    *t = NULL;
+}
+
+
+/*******************************************************************************
+ * HITIME FUNCTIONS
+*******************************************************************************/
+
+/**
+ * @return Heap allocated hitime_t struct pointer.
+ */
+hitime_t *
+hitime_new(void)
+{
+    hitime_t *h = hitime_rawalloc(sizeof(hitime_t));
+    hitime_init(h);
+    return h;
+}
+
+/**
+ * @brief Free allocated hitime_t struct pointer.
+ * @param h
+ */
+void
+hitime_free(hitime_t **h)
+{
+    hitime_destroy(*h);
+    hitime_rawfree(*h);
+    *h = NULL;
+}
+
+/**
+ * @return Time in milliseconds.
+ */
+uint64_t
+hitime_now_ms(void)
+{
+    struct timespec ts;
+    if (clock_gettime(CLOCK_MONOTONIC, &ts))
+    {
+        return 0;
+    }
+
+    return (((uint64_t)ts.tv_sec) * 1000) + ((uint64_t)ts.tv_nsec/1000000);
+}
+
+/**
+ * @return Time in seconds.
+ */
+uint64_t
+hitime_now(void)
+{
+    return (uint64_t)time(0);
+}
+
+/*******************************************************************************
+ * HITIME INTERNAL FUNCTIONS
+*******************************************************************************/
 
 /**
  * @brief Expire everything in the given bin. Mostly used in testing.
