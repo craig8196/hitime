@@ -121,12 +121,20 @@ It is recommended to wrap the functions so you don't make a mistake.
 
 Use the meson build system.
 
-```bash
-# Build
-meson setup build && cd build/ && meson compile
+To build:
 
-TODO add code coverage generation
-```
+        meson setup build && cd build/ && meson compile
+
+To run tests:
+
+        meson test
+
+To run code coverage:
+
+        meson configure --Db_coverage=true
+        meson compile
+        meson test
+        ninja coverage-html
 
 Note that the default build creates a static library.
 This is because timeout management libraries tend to be specialized and are not commonly needed for most projects.
