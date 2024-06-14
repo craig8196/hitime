@@ -207,21 +207,13 @@ If this happens then your timeouts will automatically be expired upon trying to 
 The following are reasons you might want to use this timeout manager:
 1. Constant time start and stop.
    Great if many timeouts will be stopped before expiration.
-   In fact, the timeout will only be touched a maximum of two times, and likely
-   only once, before half of the timeout period has elapsed.
+   In fact, the timeout will only be touched a maximum of two times
+   before half of the timeout period has elapsed.
    This only helps prevent performing operations in use-cases that timeouts
    are likely to expire.
 1. Bulk timeouts.
-   Great if running on a single multiplexing thread that occassionally is busy.
-   So if 8ms elapses, all timeouts in bins 4ms and lower are bulk expired.
-1. Timeouts happen in batched operations.
-   This may give a performance boost depending on the locality and allocation
-   choices used with the timeout structs.
+   Great if running on a single multiplexing thread that occasionally is busy.
 1. Granularity agnostic.
-   This can be a pitfall, but can be used for milliseconds, seconds, or
-   any other granularity.
-   Be warned that below milliseconds is not recommended;
-   the code can be retooled to better support sub-milliseconds.
 1. 100% core code coverage (`hitime.c`).
 
 
@@ -246,6 +238,8 @@ The peculiar design of this tool is so it could be tested quickly and reliably.
 This is why the user must pass in the current time.
 The user may call `hitime_timeout` at any time to force an update; although, this function may take some time to execute.
 There is a re-entrant version to process timeouts incrementally.
+
+Interestingly enough, this data-structure is like a specialized, lazy radix sort.
 
 
 ## End-of-Time
