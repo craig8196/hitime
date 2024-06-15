@@ -101,7 +101,7 @@ hitime_get_wait(hitime_t *);
 uint64_t
 hitime_get_wait_with(hitime_t *, uint64_t);
 bool
-hitime_timedelta(hitime_t *, uint64_t);
+hitime_timeout_elapse(hitime_t *, uint64_t);
 bool
 hitime_timeout(hitime_t *, uint64_t);
 bool

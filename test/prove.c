@@ -152,6 +152,32 @@ spec("hitime library")
             check(NULL == hitime_get_next(ht));
         }
 
+        it("should return false if invalid now is passed (edge-case)")
+        {
+            hitime_timeout(ht, 2);
+            check(!hitime_timeout(ht, 1));
+        }
+
+        it("should prevent overflow when timeout_elapse is called (edge-case)")
+        {
+            uint64_t max = UINT64_MAX;
+            uint64_t one_less = max - 1;
+
+            hitime_timeout(ht, one_less);
+            hitime_timeout_elapse(ht, 2);
+
+            check(max == hitime_get_last(ht));
+        }
+
+        it("should stop a timeout NOT in the manager without segfault (edge-case)")
+        {
+            hitimeout_t t;
+
+            hitimeout_init(&t);
+            hitime_stop(ht, &t);
+            hitimeout_destroy(&t);
+        }
+
         it("should start and be placed in expiry")
         {
             hitimeout_t *t = hitimeout_new();
@@ -281,7 +307,7 @@ spec("hitime library")
             hitimeout_free(&t);
         }
 
-        it("should stop an expired hitimeout")
+        it("should stop an expired timeout")
         {
             hitimeout_t *t = hitimeout_new();
 
@@ -683,7 +709,7 @@ spec("hitime library")
             //printf("Max: %lu, %lx\n", max, max);
             while (i < max_calls && wait < max)
             {
-                hitime_timedelta(ht, wait);
+                hitime_timeout_elapse(ht, wait);
                 ++i;
                 wait = hitime_get_wait(ht);
             }
@@ -745,7 +771,7 @@ spec("hitime library")
                 actuals_len = 0;
 
                 // Record the timeouts that actually timed out
-                hitime_timedelta(ht, interval);
+                hitime_timeout_elapse(ht, interval);
                 while (NULL != (t = hitime_get_next(ht)))
                 {
                     actuals[actuals_len++] = t;
@@ -788,7 +814,7 @@ spec("hitime library")
                 hitime_start(ht, t);
                 hitime_timeout(ht, t->when - 1);
                 check(hitime_count_expired(ht) == 0);
-                hitime_timedelta(ht, 1);
+                hitime_timeout_elapse(ht, 1);
                 check(hitime_count_expired(ht) == 1);
                 hitime_destroy(ht);
                 hitime_init(ht);
@@ -830,7 +856,7 @@ spec("hitime library")
                           "Bit check failed; Index: %d, Bits: %lx, Bit Index: %d", i, bits, bit_index);
 
                     // Advance timeout.
-                    hitime_timedelta(ht, hitime_get_wait(ht));
+                    hitime_timeout_elapse(ht, hitime_get_wait(ht));
 
                     // All "now" bits to the right of the triggered will be zero.
                     if (is_first_iter)

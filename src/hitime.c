@@ -41,7 +41,7 @@
 
 #if 0
 /*******************************************************************************
- * INVARIANT FUNCTIONS
+ * INVARIANT FUNCTIONS (USED WHEN DEBUGGING)
 *******************************************************************************/
 static bool
 check_list_integrity(hitime_node_t *l)
@@ -601,7 +601,7 @@ ht_update_last(hitime_t *h, uint64_t now)
  * @return False if nothing expired; true otherwise.
  */
 bool
-hitime_timedelta(hitime_t *h, uint64_t delta)
+hitime_timeout_elapse(hitime_t *h, uint64_t delta)
 {
     uint64_t now = h->last + delta;
     if (now < h->last) { now = UINT64_MAX; }
