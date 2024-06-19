@@ -428,12 +428,9 @@ hitime_start_range(hitime_t *h, hitimeout_t *t, uint64_t min, uint64_t max)
  * @brief Stop the timer by removing it from the datastructure.
  */
 void
-hitime_stop(hitime_t *h, hitimeout_t *t)
+hitime_stop(hitime_t *, hitimeout_t *t)
 {
-    // Eradicate unused value message
-    h = h;
-
-    if (node_in_list(to_node(t)))
+    if (LIKELY(node_in_list(to_node(t))))
     {
         /* Unlink must happen or list is never empty. */
         node_unlink(to_node(t));
