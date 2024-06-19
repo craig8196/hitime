@@ -136,6 +136,10 @@ To run code coverage:
         meson test
         ninja coverage-html
 
+To build release (turn on optimizations):
+
+        meson configure -Dbuildtype=release
+
 Note that the default build creates a static library.
 This is because timeout management libraries tend to be specialized and are not commonly needed for most projects.
 
